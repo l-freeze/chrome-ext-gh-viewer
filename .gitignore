@@ -1,0 +1,6 @@
+node_modules/
+dist/
+.output/
+.wxt/
+.env.local
+e2e/screenshots/

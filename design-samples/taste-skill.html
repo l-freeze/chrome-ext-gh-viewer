@@ -1,0 +1,396 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artifact Sweep</title>
+<!--
+  Sample for: Leonxlnx/taste-skill (design-taste-frontend v2) — references/app-screens.md, style "framed-sheet"
+  (draw.mjs was not run; the style was taken from library/app.json by hand: suits "devtools").
+  The screen's one question : "What is taking up Actions storage, and what can I delete?"
+  The one finding           : computed from the rows — live artifacts older than 30 days and how much they hold.
+  Most frequent job         : select the stale ones and delete them -> one primary button in the title row.
+  Face                      : frame tinted blue-grey (observability-tool hue, as the style's identity list suggests);
+                              IBM Plex Sans + IBM Plex Mono for IDs and table figures (one job); product mark drawn for this product.
+  Element only this product has: "Where the space is" bar list — repositories ranked by bytes with 2px bars, top item in the accent.
+  House rules applied: colour on data not chrome (<3%), KPIs as type in a divided strip, flat surfaces (no shadow), tables are
+  rules + alignment (no zebra, sentence-case grey header, right-aligned figures, ISO dates), missing value = grey dash,
+  one status mark per row, 18px checkboxes, selected row = 1px outline (no fill change).
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=IBM+Plex+Sans:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+:root{
+  --frame:#EEF2F5; --ground:#EEF2F5; --surface:#FFFFFF; --raised:#F4F6F8; --active:#E3E8EC;
+  --border:#E8EAEC; --rule:#F0F1F2; --control:#CDCED1;
+  --text:#131416; --muted:#5D5F60; --faint:#6B6D6E;
+  --primary:#1D1F20; --on-primary:#FFFFFF;
+  --accent:#1B6C80; --chart-2:#2F70BB;
+  --negative:#C4242A; --neg-bg:#FFEDEA; --neg-ink:#831C1E;
+  --warn-bg:#FFFBEB; --warn-ink:#92400E;
+  --neutral-bg:#EBEDEE; --neutral-ink:#353736;
+  --sel-ring:#1B6C80;
+  --font:"IBM Plex Sans","Hiragino Sans","Noto Sans JP",Inter,system-ui,sans-serif;
+  --mono:"IBM Plex Mono",ui-monospace,monospace;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --frame:#0B0E10; --ground:#0B0E10; --surface:#131719; --raised:#1A1F22; --active:#20272B;
+    --border:#242B2F; --rule:#1C2226; --control:#4A5257;
+    --text:#F1F3F4; --muted:#AAB2B6; --faint:#949CA1;
+    --primary:#F1F3F4; --on-primary:#0B0E10;
+    --accent:#5DB4C9; --chart-2:#7FA9E6;
+    --negative:#E5566F; --neg-bg:#2C1A20; --neg-ink:#F08A9C;
+    --warn-bg:#2D2412; --warn-ink:#E9B45E;
+    --neutral-bg:#20272B; --neutral-ink:#C9D0D4;
+    --sel-ring:#5DB4C9;
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --frame:#0B0E10; --ground:#0B0E10; --surface:#131719; --raised:#1A1F22; --active:#20272B;
+  --border:#242B2F; --rule:#1C2226; --control:#4A5257;
+  --text:#F1F3F4; --muted:#AAB2B6; --faint:#949CA1;
+  --primary:#F1F3F4; --on-primary:#0B0E10;
+  --accent:#5DB4C9; --chart-2:#7FA9E6;
+  --negative:#E5566F; --neg-bg:#2C1A20; --neg-ink:#F08A9C;
+  --warn-bg:#2D2412; --warn-ink:#E9B45E;
+  --neutral-bg:#20272B; --neutral-ink:#C9D0D4;
+  --sel-ring:#5DB4C9;
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--frame);color:var(--text);font:400 14px/1.45 var(--font)}
+::selection{background:color-mix(in srgb,var(--accent) 22%,transparent)}
+button,input,select{font:inherit;color:inherit;caret-color:var(--accent)}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+*{scrollbar-color:var(--control) transparent;scrollbar-width:thin}
+.num,.mono{font-family:var(--mono);font-variant-numeric:tabular-nums}
+
+/* Framed shell: one tinted L-frame, sheet inset 8px, 16px corners, no shadow */
+.shell{display:grid;grid-template-columns:228px minmax(0,1fr);grid-template-rows:48px minmax(0,1fr);height:100dvh}
+.side{grid-row:1/3;display:flex;flex-direction:column;gap:20px;padding:12px 12px 16px 16px;overflow:auto}
+.top{display:flex;align-items:center;gap:16px;padding-right:16px;min-width:0}
+.sheet{background:var(--surface);border:1px solid var(--border);border-radius:16px;margin:0 8px 8px 0;overflow:auto;min-width:0}
+
+.prod{display:flex;align-items:center;gap:10px;height:24px;font-weight:600}
+.prod svg{flex:none}
+.side h2{margin:0 0 6px;font-size:12px;font-weight:500;color:var(--muted)}
+.olist{display:flex;flex-direction:column;gap:2px}
+.o{display:grid;grid-template-columns:18px 24px 1fr auto;gap:8px;align-items:center;height:34px;padding:0 6px;border-radius:6px;cursor:pointer}
+.o:hover{background:var(--active)}
+.o .ini{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:600}
+.o .ini.org{border-radius:6px}
+.o .nm{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.o .ct{font-size:12px;color:var(--muted)}
+.o.off .nm{color:var(--muted)}
+/* 18px checkbox, 2px stroke, 3px radius */
+.cb{appearance:none;width:18px;height:18px;margin:0;border:2px solid var(--control);border-radius:3px;display:grid;place-items:center;cursor:pointer;background:var(--surface)}
+.cb:checked{background:var(--text);border-color:var(--text)}
+.cb:checked::after{content:"";width:9px;height:5px;border:2px solid var(--surface);border-top:0;border-right:0;transform:translateY(-1px) rotate(-45deg)}
+.cb:indeterminate{background:var(--text);border-color:var(--text)}
+.cb:indeterminate::after{content:"";width:8px;height:2px;background:var(--surface)}
+.cb:disabled{opacity:.4;cursor:not-allowed}
+.scan{margin-top:auto;font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.scan .t{height:4px;border-radius:2px;background:var(--active)}
+.scan .t i{display:block;height:100%;width:90.4%;border-radius:2px;background:var(--accent)}
+.scan a{color:var(--text)}
+
+.tabs{display:flex;gap:20px;height:100%}
+.tab{appearance:none;border:0;background:none;padding:0;height:100%;color:var(--muted);font-weight:500;border-bottom:2px solid transparent;cursor:pointer;display:flex;align-items:center;gap:6px}
+.tab[aria-selected="true"]{color:var(--text);border-bottom-color:var(--text);font-weight:600}
+.tab .c{font-size:12px;color:var(--muted);font-weight:400}
+.search{margin-left:auto;display:flex;align-items:center;gap:6px;width:256px;height:30px;border:1px solid var(--border);border-radius:6px;background:var(--surface);padding:0 8px;color:var(--muted)}
+.search input{border:0;outline:0;background:transparent;width:100%;height:28px}
+.acct{display:flex;align-items:center;gap:8px;font-size:13px;color:var(--muted)}
+
+/* Sheet content */
+.page{padding:24px;display:flex;flex-direction:column;gap:24px;max-width:1360px}
+.title{display:flex;align-items:flex-start;gap:16px;flex-wrap:wrap}
+.title h1{margin:0;font-size:22px;font-weight:600;letter-spacing:-.01em}
+.title p{margin:4px 0 0;color:var(--muted);max-width:70ch}
+.title p b{color:var(--text);font-weight:500}
+.title .act{margin-left:auto;display:flex;gap:8px}
+.btn{appearance:none;height:32px;padding:0 12px;border-radius:6px;border:1px solid var(--control);background:var(--surface);font-weight:500;cursor:pointer;display:inline-flex;align-items:center;gap:6px;white-space:nowrap}
+.btn:hover{background:var(--raised)}
+.btn.primary{background:var(--primary);color:var(--on-primary);border-color:var(--primary)}
+.btn.primary:hover{opacity:.9}
+.btn.neg{color:var(--negative);border-color:color-mix(in srgb,var(--negative) 40%,var(--control))}
+.btn.neg:hover{background:var(--neg-bg)}
+.btn.negfill{background:var(--negative);border-color:var(--negative);color:#fff}
+.btn.text{border-color:transparent;background:none;color:var(--muted)}
+
+.kpis{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));border-top:1px solid var(--border);border-bottom:1px solid var(--border)}
+.kpis div{padding:14px 20px 14px 0;display:flex;flex-direction:column;gap:2px}
+.kpis div+div{border-left:1px solid var(--border);padding-left:20px}
+.kpis span{font-size:12px;color:var(--muted)}
+.kpis b{font-size:28px;font-weight:400;line-height:1.15;font-variant-numeric:tabular-nums}
+.kpis b small{font-size:14px;color:var(--muted);margin-left:2px}
+.kpis em{font-style:normal;font-size:12px;color:var(--muted)}
+
+.work{display:grid;grid-template-columns:minmax(0,1fr) 248px;gap:24px;align-items:start}
+.panel{border:1px solid var(--border);border-radius:8px;background:var(--surface);min-width:0}
+.tbar{display:flex;align-items:center;gap:8px;padding:10px 12px;flex-wrap:wrap;min-height:52px}
+.tbar .f{display:flex;align-items:center;gap:6px;height:32px;border:1px solid var(--border);border-radius:6px;padding:0 8px;font-size:13px;color:var(--muted)}
+.tbar .f input,.tbar .f select{border:0;outline:0;background:transparent;height:30px;color:var(--text)}
+.tbar .f input[type=number]{width:40px;font-family:var(--mono)}
+.tbar .tot{margin-left:auto;font-size:13px;color:var(--muted)}
+.tbar.bulk .what{font-weight:600}
+.tbar.bulk .what span{font-weight:400;color:var(--muted)}
+.tbar.bulk .right{margin-left:auto;display:flex;gap:8px}
+.tw{overflow-x:auto}
+table{width:100%;border-collapse:collapse;min-width:760px}
+th,td{padding:0 10px;text-align:left;white-space:nowrap}
+th{height:38px;font-size:12px;font-weight:400;color:var(--muted);border-bottom:1px solid var(--border)}
+th.num,td.num{text-align:right}
+th button{all:unset;cursor:pointer}
+th button:focus-visible{outline:2px solid var(--accent)}
+th .on{color:var(--text)}
+td{height:48px;border-bottom:1px solid var(--rule)}
+tbody tr:last-child td{border-bottom:0}
+td.c,th.c{width:42px;padding-right:0}
+tbody tr.sel{outline:1px solid var(--sel-ring);outline-offset:-1px}
+tbody tr:hover:not(.sel){outline:1px solid var(--control);outline-offset:-1px}
+.id b{display:block;font-weight:500;font-family:var(--mono);font-size:13px;overflow:hidden;text-overflow:ellipsis;max-width:240px}
+.id span{display:block;font-size:12px;color:var(--muted);margin-top:1px}
+td.br{font-family:var(--mono);font-size:12.5px;color:var(--muted);max-width:150px;overflow:hidden;text-overflow:ellipsis}
+.dash{color:var(--faint)}
+td.num{font-size:13px}
+td .unit{color:var(--muted)}
+tr.expired td{color:var(--muted)}
+tr.expired .id b{font-weight:400}
+.pill{margin-right:6px;font-family:var(--font);display:inline-flex;align-items:center;height:20px;padding:0 7px;border-radius:4px;font-size:12px;font-weight:500;flex:none;white-space:nowrap}
+.pill.neutral{background:var(--neutral-bg);color:var(--neutral-ink)}
+.pill.warn{background:var(--warn-bg);color:var(--warn-ink)}
+.ra{appearance:none;border:1px solid var(--border);background:none;height:28px;padding:0 10px;border-radius:6px;cursor:pointer;font-size:13px;color:var(--text)}
+.ra:hover{background:var(--raised)}
+.tfoot{display:flex;justify-content:space-between;padding:10px 12px;border-top:1px solid var(--rule);font-size:12px;color:var(--muted)}
+
+.space{padding:16px;display:flex;flex-direction:column;gap:12px}
+.space h2{margin:0;font-size:16px;font-weight:600}
+.space p{margin:0;font-size:12px;color:var(--muted)}
+.bl{display:flex;flex-direction:column;gap:12px;margin:0;padding:0;list-style:none}
+.bl li{display:flex;flex-direction:column;gap:5px}
+.bl .row{display:flex;justify-content:space-between;gap:8px;font-size:13px}
+.bl .row span:first-child{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.bl .row .num{font-size:12.5px}
+.bl .b{height:2px;background:var(--rule);border-radius:1px}
+.bl .b i{display:block;height:100%;background:var(--muted);border-radius:1px}
+.bl li:first-child .b i{background:var(--accent)}
+.bl .sub{font-size:12px;color:var(--muted)}
+
+dialog{border:1px solid var(--border);border-radius:12px;background:var(--surface);color:var(--text);padding:20px;width:min(440px,calc(100vw - 32px))}
+dialog::backdrop{background:rgba(10,14,16,.45)}
+dialog h3{margin:0 0 6px;font-size:16px;font-weight:600}
+dialog p{margin:0 0 12px;color:var(--muted)}
+dialog ul{margin:0 0 16px;padding:0;list-style:none;border-top:1px solid var(--rule)}
+dialog li{display:flex;justify-content:space-between;gap:12px;padding:8px 0;border-bottom:1px solid var(--rule);font-size:13px}
+dialog .acts{display:flex;justify-content:flex-end;gap:8px}
+.theme{position:fixed;right:20px;bottom:20px;font-size:12px;height:28px}
+
+@media (max-width:1180px){.work{grid-template-columns:1fr}}
+@media (max-width:820px){
+  .shell{grid-template-columns:1fr;grid-template-rows:auto auto 1fr;height:auto;min-height:100dvh}
+  .side{grid-row:auto;padding:12px 16px}
+  .top{padding-inline:16px;height:48px}
+  .search{display:none}
+  .sheet{margin:0 8px 8px}
+  .page{padding:16px}
+  .kpis{grid-template-columns:repeat(2,1fr)}
+  .kpis div:nth-child(3){border-left:0;padding-left:0}
+}
+</style>
+</head>
+<body>
+<div class="shell">
+  <aside class="side">
+    <div class="prod">
+      <svg width="24" height="24" viewBox="0 0 24 24" aria-hidden="true"><rect x="1" y="1" width="22" height="22" rx="6" fill="var(--accent)"/><path d="M6.5 15.5h11M6.5 11.5h7M6.5 7.5h4" stroke="#fff" stroke-width="2" stroke-linecap="round"/></svg>
+      Artifact Sweep
+    </div>
+    <section>
+      <h2>Owners</h2>
+      <div class="olist" id="owners"></div>
+    </section>
+    <div class="scan" role="status">
+      <span>47 of 52 repositories scanned</span>
+      <div class="t"><i></i></div>
+      <span>Next: acme-labs/infra-terraform</span>
+      <a href="#">Settings</a>
+    </div>
+  </aside>
+
+  <div class="top">
+    <nav class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true">Artifacts <span class="c" id="tabN"></span></button>
+      <button class="tab" role="tab" aria-selected="false">Issues <span class="c">38</span></button>
+    </nav>
+    <label class="search"><svg width="14" height="14" viewBox="0 0 16 16" aria-hidden="true"><circle cx="7" cy="7" r="4.5" fill="none" stroke="currentColor" stroke-width="1.5"/><path d="m10.5 10.5 3 3" stroke="currentColor" stroke-width="1.5" stroke-linecap="round"/></svg><input placeholder="Search artifacts" aria-label="Search artifacts"></label>
+    <span class="acct">sora-builds</span>
+  </div>
+
+  <div class="sheet">
+    <div class="page">
+      <div class="title">
+        <div>
+          <h1>Artifacts</h1>
+          <p id="finding"></p>
+        </div>
+        <div class="act"><button class="btn primary" id="selStale"></button></div>
+      </div>
+
+      <div class="kpis" id="kpis"></div>
+
+      <div class="work">
+        <section class="panel" aria-label="Artifacts table">
+          <div id="tbar"></div>
+          <div class="tw">
+            <table>
+              <thead><tr>
+                <th class="c"><input type="checkbox" class="cb" id="all" aria-label="Select all"></th>
+                <th>Artifact</th>
+                <th>Branch</th>
+                <th class="num"><button>Size</button></th>
+                <th class="num"><button class="on" aria-sort="descending">Created ↓</button></th>
+                <th class="num"><button>Expires</button></th>
+                <th class="num"><span hidden>Action</span></th>
+              </tr></thead>
+              <tbody id="rows"></tbody>
+            </table>
+          </div>
+          <div class="tfoot"><span id="tf"></span><span>Expired artifacts no longer count toward storage.</span></div>
+        </section>
+
+        <section class="panel space" aria-labelledby="sp">
+          <h2 id="sp">Where the space is</h2>
+          <p>Live artifacts by repository, largest first.</p>
+          <ul class="bl" id="bl"></ul>
+        </section>
+      </div>
+    </div>
+  </div>
+</div>
+
+<dialog id="dlg" aria-labelledby="dt">
+  <h3 id="dt"></h3>
+  <p>They are removed from GitHub for everyone with access to these repositories. This cannot be undone.</p>
+  <ul id="dlist"></ul>
+  <div class="acts"><button class="btn" id="keep">Keep them</button><button class="btn negfill" id="go"></button></div>
+</dialog>
+<button class="btn theme" id="theme">Light / dark</button>
+
+<script>
+const TODAY = new Date("2026-10-30T12:00:00Z");
+const STALE_DAYS = 30;
+const OWNERS = [
+  {login:"sora-builds", org:false, tint:"#DCE6F5", ink:"#24467A", on:true},
+  {login:"acme-labs", org:true, tint:"#D7EEE6", ink:"#145442", on:true},
+  {login:"my-sideprojects", org:true, tint:"#F4E3D2", ink:"#6E3C10", on:true},
+];
+const ROWS = [
+  {id:"a1", repo:"acme-labs/web-console", name:"playwright-report", mb:148.6, created:"2026-10-29", expires:"2027-01-27", branch:"main"},
+  {id:"a2", repo:"acme-labs/web-console", name:"dist-bundle", mb:23.4, created:"2026-10-28", expires:"2027-01-26", branch:"feat/billing-page"},
+  {id:"a3", repo:"acme-labs/web-console", name:"coverage-lcov", mb:6.1, created:"2026-08-02", expires:"2026-10-31", branch:"main"},
+  {id:"a4", repo:"acme-labs/data-pipeline", name:"parquet-sample-export", mb:412.8, created:"2026-09-14", expires:"2026-12-13", branch:"main", sel:true},
+  {id:"a5", repo:"acme-labs/data-pipeline", name:"dbt-docs-site", mb:18.9, created:"2026-07-21", expires:"2026-10-19", branch:"release/2.4", expired:true},
+  {id:"a6", repo:"acme-labs/data-pipeline", name:"test-results-junit", mb:1.2, created:"2026-10-30", expires:"2027-01-28", branch:"fix/null-partition"},
+  {id:"a7", repo:"acme-labs/mobile-app", name:"android-release-apk", mb:96.3, created:"2026-10-21", expires:"2027-01-19", branch:"release/5.2.0"},
+  {id:"a8", repo:"acme-labs/mobile-app", name:"ios-simulator-build", mb:311.5, created:"2026-07-30", expires:"2026-10-28", branch:"main", expired:true},
+  {id:"a9", repo:"acme-labs/mobile-app", name:"detox-screenshots", mb:54.0, created:"2026-10-03", expires:"2027-01-01", branch:"main"},
+  {id:"a10", repo:"my-sideprojects/tile-game", name:"webgl-build", mb:72.2, created:"2026-10-12", expires:"2026-11-11", branch:"main"},
+  {id:"a11", repo:"my-sideprojects/tile-game", name:"wasm-profile-trace", mb:8.7, created:"2026-09-01", expires:"2026-10-01", branch:"perf/atlas-packing", expired:true},
+  {id:"a12", repo:"sora-builds/dotfiles", name:"nix-closure-cache", mb:204.0, created:"2026-08-20", expires:"2026-11-18", branch:null, sel:true},
+];
+const day = s => new Date(s+"T12:00:00Z");
+const dd = (a,b) => Math.round((b-a)/864e5);
+const MB = v => v.toLocaleString("en-US",{minimumFractionDigits:1,maximumFractionDigits:1});
+const sum = a => a.reduce((s,r)=>s+r.mb,0);
+
+function render(){
+  const oEl=document.getElementById("owners"); oEl.innerHTML="";
+  OWNERS.forEach(o=>{
+    const n=ROWS.filter(r=>r.repo.startsWith(o.login+"/")).length;
+    const l=document.createElement("label"); l.className="o"+(o.on?"":" off");
+    l.innerHTML=`<input type="checkbox" class="cb" ${o.on?"checked":""}><span class="ini ${o.org?"org":""}" style="background:${o.tint};color:${o.ink}">${o.login[0].toUpperCase()}</span><span class="nm">${o.login}</span><span class="ct num">${n}</span>`;
+    l.querySelector("input").onchange=e=>{o.on=e.target.checked;render();};
+    oEl.appendChild(l);
+  });
+  const vis=ROWS.filter(r=>OWNERS.find(o=>r.repo.startsWith(o.login+"/")).on);
+  const live=vis.filter(r=>!r.expired);
+  const stale=live.filter(r=>dd(day(r.created),TODAY)>STALE_DAYS);
+  const sel=vis.filter(r=>r.sel); const selMB=sum(sel);
+  const total=sum(live);
+  const week=live.filter(r=>dd(TODAY,day(r.expires))<=7);
+  const repos=[...new Set(vis.map(r=>r.repo))];
+  console.assert(Math.abs(sum(repos.map(k=>({mb:sum(live.filter(r=>r.repo===k))})))-total)<1e-6,"repo bars must add up to the total");
+
+  document.getElementById("tabN").textContent=vis.length;
+  const biggest=stale.slice().sort((a,b)=>b.mb-a.mb)[0];
+  document.getElementById("finding").innerHTML = stale.length
+    ? `<b>${stale.length} live artifacts are over ${STALE_DAYS} days old and hold ${MB(sum(stale))} MB</b>, ${Math.round(sum(stale)/total*100)}% of what is stored. ${biggest.name} in ${biggest.repo.split("/")[1]} alone is ${MB(biggest.mb)} MB.`
+    : `Nothing older than ${STALE_DAYS} days in the selected owners.`;
+  const sb=document.getElementById("selStale");
+  sb.textContent=`Select ${stale.length} older than ${STALE_DAYS} days`;
+  sb.disabled=!stale.length;
+  sb.onclick=()=>{ROWS.forEach(r=>r.sel=stale.includes(r));render();};
+
+  document.getElementById("kpis").innerHTML=`
+    <div><span>Stored in artifacts</span><b class="num">${MB(total)}<small>MB</small></b><em>${live.length} live artifacts</em></div>
+    <div><span>Artifacts listed</span><b class="num">${vis.length}</b><em>${vis.length-live.length} expired, kept for reference</em></div>
+    <div><span>Repositories with artifacts</span><b class="num">${repos.length}</b><em>of 47 scanned so far</em></div>
+    <div><span>Expiring within 7 days</span><b class="num">${week.length}</b><em>${week.length?week.map(r=>r.name).join(", "):"—"}</em></div>`;
+
+  const tb=document.getElementById("tbar");
+  if(sel.length){
+    tb.className="tbar bulk";
+    tb.innerHTML=`<span class="what">${sel.length} selected <span class="num">· ${MB(selMB)} MB</span></span>
+      <div class="right"><button class="btn">Download ${sel.length}</button><button class="btn neg" id="del">Delete ${sel.length}…</button><button class="btn text" id="clr">Clear</button></div>`;
+    tb.querySelector("#clr").onclick=()=>{ROWS.forEach(r=>r.sel=false);render();};
+    tb.querySelector("#del").onclick=()=>document.getElementById("dlg").showModal();
+  } else {
+    tb.className="tbar";
+    tb.innerHTML=`<label class="f">Repository <input placeholder="any" size="12"></label>
+      <label class="f">Older than <input type="number" value="0"> days</label>
+      <label class="f">At least <input type="number" value="0"> MB</label>
+      <label class="f"><select aria-label="State"><option>Any state</option><option>Live</option><option>Expired</option></select></label>
+      <span class="tot">${vis.length} artifacts</span>`;
+  }
+
+  const rows=document.getElementById("rows"); rows.innerHTML="";
+  vis.slice().sort((a,b)=>day(b.created)-day(a.created)).forEach(r=>{
+    const left=dd(TODAY,day(r.expires));
+    const state=r.expired?`<span class="pill neutral">Expired</span> `:left<=1?`<span class="pill warn">Tomorrow</span> `:"";
+    const tr=document.createElement("tr"); tr.className=(r.sel?"sel ":"")+(r.expired?"expired":"");
+    tr.innerHTML=`<td class="c"><input type="checkbox" class="cb" ${r.sel?"checked":""} ${r.expired?"disabled":""} aria-label="Select ${r.name}"></td>
+      <td class="id"><b>${r.name}</b><span>${r.repo}</span></td>
+      <td class="br">${r.branch??'<span class="dash">—</span>'}</td>
+      <td class="num">${MB(r.mb)} <span class="unit">MB</span></td>
+      <td class="num">${r.created}</td>
+      <td class="num">${state}${r.expires}</td>
+      <td class="num">${r.expired?'<span class="dash">—</span>':'<button class="ra">Download</button>'}</td>`;
+    tr.querySelector("input").onchange=e=>{r.sel=e.target.checked;render();};
+    rows.appendChild(tr);
+  });
+  const all=document.getElementById("all");
+  all.checked=live.length&&live.every(r=>r.sel); all.indeterminate=sel.length>0&&sel.length<live.length;
+  document.getElementById("tf").textContent=`${vis.length} artifacts in ${repos.length} repositories`;
+
+  const by=repos.map(k=>({k,v:sum(live.filter(r=>r.repo===k)),n:live.filter(r=>r.repo===k).length})).filter(x=>x.v>0).sort((a,b)=>b.v-a.v);
+  const max=by[0]?.v||1;
+  document.getElementById("bl").innerHTML=by.map(x=>`<li><div class="row"><span>${x.k.split("/")[1]}</span><span class="num">${MB(x.v)} MB</span></div><div class="b"><i style="width:${x.v/max*88}%"></i></div><span class="sub">${x.k.split("/")[0]} · ${x.n} artifact${x.n>1?"s":""}</span></li>`).join("");
+
+  document.getElementById("dt").textContent=`Delete ${sel.length} artifacts (${MB(selMB)} MB)?`;
+  document.getElementById("go").textContent=`Delete ${sel.length} artifacts`;
+  document.getElementById("dlist").innerHTML=sel.map(r=>`<li><span class="mono">${r.repo.split("/")[1]}/${r.name}</span><span class="num">${MB(r.mb)} MB</span></li>`).join("");
+}
+document.getElementById("all").onchange=e=>{ROWS.forEach(r=>{if(!r.expired)r.sel=e.target.checked});render();};
+document.getElementById("keep").onclick=()=>document.getElementById("dlg").close();
+document.getElementById("go").onclick=()=>document.getElementById("dlg").close();
+document.getElementById("theme").onclick=()=>{const r=document.documentElement;const dark=r.dataset.theme?r.dataset.theme==="dark":matchMedia("(prefers-color-scheme: dark)").matches;r.dataset.theme=dark?"light":"dark";};
+render();
+</script>
+</body>
+</html>

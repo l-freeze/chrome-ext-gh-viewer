@@ -1,0 +1,4 @@
+{
+  "extName": { "message": "Artifact & Issue Manager for GitHub" },
+  "extDescription": { "message": "アクセスできる全リポジトリの GitHub Actions アーティファクトを一覧・ダウンロード・削除し、Issue を横断表示します。" }
+}

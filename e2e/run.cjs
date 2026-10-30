@@ -1,0 +1,176 @@
+// ビルド済みの拡張機能を Chromium に読み込み、GitHub API を偽の応答に差し替えて画面を操作する。
+// 使い方: npm run e2e（OAuth の画面も確かめるため、ダミーの Client ID を入れてビルドする）
+const path = require("node:path");
+const fs = require("node:fs");
+const assert = require("node:assert/strict");
+const { launch } = require("./harness.cjs");
+
+const OUT = path.resolve(process.argv[2] ?? path.join(__dirname, "screenshots"));
+fs.mkdirSync(OUT, { recursive: true });
+
+async function connect(page, id) {
+  await page.goto(`chrome-extension://${id}/manager.html#settings`);
+  await page.getByRole("radio", { name: /^Personal access token/ }).check();
+  await page.getByPlaceholder(/ghp_/).fill("ghp_e2e_fake_token_1234");
+  await page.getByRole("button", { name: "Add token" }).click();
+  await page.getByText("ghp_…1234").waitFor();
+}
+
+const steps = [];
+const step = async (name, fn) => {
+  await fn();
+  steps.push(name);
+  console.log("ok -", name);
+};
+
+(async () => {
+  // ---- 英語・ライト ---------------------------------------------------------
+  const { context, page, id, log, errors } = await launch();
+
+  await step("未接続ならオンボーディングを表示", async () => {
+    await page.goto(`chrome-extension://${id}/manager.html`);
+    await page.getByRole("heading", { name: "Connect your GitHub account" }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "01-onboarding.png") });
+  });
+
+  await step("PAT を追加するとトークン情報を表示", async () => {
+    await connect(page, id);
+    await page.getByText("Scopes: repo, read:org").waitFor();
+    await page.getByText("Expires 2027-01-31").waitFor();
+    await page.screenshot({ path: path.join(OUT, "02-settings-pat.png") });
+  });
+
+  await step("全リポジトリのアーティファクトを一覧し、読めないリポジトリを示す", async () => {
+    await page.goto(`chrome-extension://${id}/manager.html#artifacts`);
+    await page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".row--skeleton"));
+    assert.equal(await page.locator("tbody tr").count(), 12);
+    await page.getByText("1 repository could not be read").waitFor();
+    await page.getByRole("button", { name: /acme-labs/ }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "03-artifacts.png") });
+  });
+
+  await step("SSO が必要なリポジトリは承認リンクを出す", async () => {
+    await page.getByText("1 repository could not be read").click();
+    const link = page.getByRole("link", { name: "Authorize" });
+    assert.match(await link.getAttribute("href"), /locked-corp\/sso/);
+    await page.getByText("1 repository could not be read").click();
+  });
+
+  await step("古いものをまとめて選ぶ", async () => {
+    await page.getByRole("button", { name: /Select 3 older than 30 days/ }).click();
+    await page.getByText("3 selected").waitFor();
+    await page.screenshot({ path: path.join(OUT, "04-selected.png") });
+  });
+
+  await step("削除は確認してから実行し、一覧から消す", async () => {
+    await page.getByRole("button", { name: "Delete 3" }).click();
+    await page.getByText(/Permanently delete 3 artifacts/).waitFor();
+    await page.screenshot({ path: path.join(OUT, "05-confirm-delete.png") });
+    await page.getByRole("button", { name: "Delete permanently" }).click();
+    await page.getByText("Deleted 3 artifacts.").waitFor();
+    assert.equal(await page.locator("tbody tr").count(), 9);
+    assert.equal(log.filter((l) => l.startsWith("DELETE")).length, 3);
+  });
+
+  await step("絞り込み: 状態とサイズ", async () => {
+    await page.getByRole("radio", { name: "Expired" }).click();
+    assert.equal(await page.locator("tbody tr").count(), 3);
+    await page.getByRole("radio", { name: "All" }).click();
+    await page.locator("label", { hasText: "At least" }).locator("input").fill("100");
+    assert.equal(await page.locator("tbody tr").count(), 2);
+    await page.locator("label", { hasText: "At least" }).locator("input").fill("");
+  });
+
+  await step("所有者を外すとその所有者の行が消える", async () => {
+    await page.getByRole("button", { name: /^octo-dev/ }).click();
+    assert.equal(await page.locator("tbody tr").count(), 7);
+    await page.getByRole("button", { name: /^octo-dev/ }).click();
+    assert.equal(await page.locator("tbody tr").count(), 9);
+  });
+
+  await step("ダウンロードを chrome.downloads で開始する", async () => {
+    await page.getByRole("button", { name: "Download playwright-report" }).click();
+    await page.getByText(/Started 1 download\.|Download of playwright-report failed/).waitFor();
+    // chrome.downloads の通信は Playwright の route で差し替えられないため、Chrome が記録した内容だけを確認する
+    const [sw] = context.serviceWorkers();
+    await page.waitForTimeout(2000);
+    const items = await sw.evaluate(() => chrome.downloads.search({}));
+    const item = items[0];
+    assert.match(item.url, /\/repos\/acme-labs\/web-console\/actions\/artifacts\/\d+\/zip$/);
+    console.log("   download state:", item.state, item.error ?? "", "finalUrl:", item.finalUrl);
+    // 偽のトークンなので本物の GitHub に拒否される。中断を画面に出せているかを確認する
+    if (item.state === "interrupted") await page.getByText(/Download of playwright-report failed/).waitFor();
+  });
+
+  await step("Issue を所有者横断でリポジトリごとに表示", async () => {
+    await page.getByRole("link", { name: /^Issues/ }).click();
+    await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+    await page.getByText("1 owner could not be searched").waitFor();
+    assert.equal(await page.locator(".group-row").count(), 5);
+    await page.screenshot({ path: path.join(OUT, "06-issues.png") });
+    await page.getByPlaceholder(/Title, label/).fill("bug");
+    assert.equal(await page.locator("tbody tr:not(.group-row)").count(), 3);
+    await page.getByPlaceholder(/Title, label/).fill("");
+    await page.getByRole("radio", { name: "Closed" }).click();
+    await page.getByRole("link", { name: "Dark mode contrast on the settings screen" }).waitFor();
+  });
+
+  assert.deepEqual(errors, [], "page errors");
+  await context.close();
+
+  // ---- OAuth（Device Flow） ---------------------------------------------------
+  {
+    const { context, page, id, log } = await launch();
+    await step("GitHub でログイン: コードを表示し、承認後にログイン状態になる", async () => {
+      await page.goto(`chrome-extension://${id}/manager.html#settings`);
+      await page.getByRole("button", { name: "Sign in with GitHub" }).click();
+      await page.getByText("WXYZ-1234").waitFor();
+      await page.screenshot({ path: path.join(OUT, "09-oauth-code.png") });
+      await page.getByText("Signed in as octo-dev").waitFor();
+      assert.ok(log.includes("POST github.com/login/oauth/access_token"));
+      await page.goto(`chrome-extension://${id}/manager.html#artifacts`);
+      await page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+    });
+    await context.close();
+  }
+
+  // ---- ダーク ---------------------------------------------------------------
+  {
+    const { context, page, id } = await launch({ colorScheme: "dark" });
+    await connect(page, id);
+    await page.goto(`chrome-extension://${id}/manager.html#artifacts`);
+    await page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".row--skeleton"));
+    await page.getByRole("button", { name: /Select 3 older than 30 days/ }).click();
+    await page.screenshot({ path: path.join(OUT, "07-artifacts-dark.png") });
+    await context.close();
+    steps.push("ダークモード");
+  }
+
+  // ---- 日本語 ---------------------------------------------------------------
+  {
+    const { context, page, id } = await launch({ locale: "ja-JP" });
+    await page.goto(`chrome-extension://${id}/manager.html`);
+    const title = await page.locator("h1").textContent();
+    console.log("ja onboarding title:", title);
+    if (title.includes("GitHub アカウント")) {
+      await page.goto(`chrome-extension://${id}/manager.html#settings`);
+      await page.getByRole("radio", { name: /^Personal Access Token/ }).check();
+      await page.getByPlaceholder(/ghp_/).fill("ghp_e2e_fake_token_1234");
+      await page.getByRole("button", { name: "追加" }).click();
+      await page.getByText("ghp_…1234").waitFor();
+      await page.goto(`chrome-extension://${id}/manager.html#artifacts`);
+      await page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+      await page.waitForFunction(() => !document.querySelector(".row--skeleton"));
+      await page.screenshot({ path: path.join(OUT, "08-artifacts-ja.png") });
+      steps.push("日本語表示");
+    }
+    await context.close();
+  }
+
+  console.log(`\n${steps.length} steps passed`);
+})().catch((e) => {
+  console.error(e);
+  process.exit(1);
+});

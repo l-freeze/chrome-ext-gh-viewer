@@ -1,0 +1,26 @@
+{
+  "name": "github-artifact-manager",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "wxt",
+    "build": "wxt build",
+    "zip": "wxt zip",
+    "postinstall": "wxt prepare",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run",
+    "e2e": "WXT_GITHUB_CLIENT_ID=e2e-dummy-client-id wxt build && node e2e/run.cjs"
+  },
+  "devDependencies": {
+    "@wxt-dev/module-solid": "1.1.4",
+    "typescript": "^7.0.2",
+    "vitest": "^5.0.5",
+    "wxt": "0.21.5"
+  },
+  "dependencies": {
+    "solid-js": "1.9.18"
+  },
+  "description": "Chrome extension to list, download and delete GitHub Actions artifacts and browse issues across all accessible repositories.",
+  "license": "MIT"
+}
