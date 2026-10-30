@@ -1,0 +1,4 @@
+{
+  "extName": { "message": "Artifact & Issue Manager for GitHub" },
+  "extDescription": { "message": "List, download and delete GitHub Actions artifacts and browse issues across every repository you can access." }
+}

@@ -1,0 +1,9 @@
+{
+  "extends": "./.wxt/tsconfig.json",
+  "compilerOptions": {
+    "jsx": "preserve",
+    "jsxImportSource": "solid-js",
+    "types": []
+  },
+  "include": ["src", "test", ".wxt/wxt.d.ts", "wxt.config.ts", "vitest.config.ts"]
+}

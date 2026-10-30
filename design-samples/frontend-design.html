@@ -1,0 +1,351 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Artifact Shelf</title>
+<!--
+  Sample for: anthropics/skills — frontend-design
+  Design plan (pass 1, reviewed against the brief):
+    Color  : lichen ground #ECEFEA / sheet #FAFBF8 / rule #D5DBD3 / ink #18211C / muted #56625A / verdigris accent #0E6B5C
+             (+ caution #9A5B00, danger #B3262E). Avoided cream+terracotta and near-black+acid-green defaults.
+    Type   : Schibsted Grotesk only (one family, weight + size contrast). Tabular figures, no mono costume, sentence case, no eyebrows.
+    Layout : left owner rail + work column. The one memorable thing is the "storage map": every artifact as a
+             proportional block, colored by repo, so the space you are about to free is visible before you read the table.
+             Everything else is quiet. Retention shown as remaining days of the retention window.
+-->
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Schibsted+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet">
+<style>
+:root{
+  --ground:#ECEFEA; --sheet:#FAFBF8; --sheet-2:#F2F5F0; --rule:#D5DBD3; --rule-soft:#E4E8E2;
+  --ink:#18211C; --muted:#56625A; --faint:#7A857D;
+  --accent:#0E6B5C; --accent-ink:#0A5246; --accent-soft:rgba(14,107,92,.12); --on-accent:#FFFFFF;
+  --caution:#9A5B00; --caution-soft:rgba(154,91,0,.12);
+  --danger:#B3262E; --danger-soft:rgba(179,38,46,.10); --on-danger:#FFFFFF;
+  --r1:#0E6B5C; --r2:#3A62B0; --r3:#A35F12; --r4:#8A4A9C; --r5:#5B7A2A;
+  --hatch:rgba(24,33,28,.28);
+  --font:"Schibsted Grotesk","Hiragino Sans","Noto Sans JP",system-ui,sans-serif;
+  color-scheme:light;
+}
+@media (prefers-color-scheme:dark){
+  :root:not([data-theme="light"]){
+    --ground:#131A17; --sheet:#19211D; --sheet-2:#1F2824; --rule:#2E3933; --rule-soft:#25302A;
+    --ink:#E3EAE5; --muted:#9BA9A0; --faint:#7D8B82;
+    --accent:#52C3AC; --accent-ink:#7BD6C3; --accent-soft:rgba(82,195,172,.14); --on-accent:#0B1A16;
+    --caution:#E3A84E; --caution-soft:rgba(227,168,78,.14);
+    --danger:#F0727A; --danger-soft:rgba(240,114,122,.14); --on-danger:#1A0B0C;
+    --r1:#52C3AC; --r2:#7EA2EE; --r3:#E0A35A; --r4:#C792D6; --r5:#9DBE62;
+    --hatch:rgba(227,234,229,.30);
+    color-scheme:dark;
+  }
+}
+:root[data-theme="dark"]{
+  --ground:#131A17; --sheet:#19211D; --sheet-2:#1F2824; --rule:#2E3933; --rule-soft:#25302A;
+  --ink:#E3EAE5; --muted:#9BA9A0; --faint:#7D8B82;
+  --accent:#52C3AC; --accent-ink:#7BD6C3; --accent-soft:rgba(82,195,172,.14); --on-accent:#0B1A16;
+  --caution:#E3A84E; --caution-soft:rgba(227,168,78,.14);
+  --danger:#F0727A; --danger-soft:rgba(240,114,122,.14); --on-danger:#1A0B0C;
+  --r1:#52C3AC; --r2:#7EA2EE; --r3:#E0A35A; --r4:#C792D6; --r5:#9DBE62;
+  --hatch:rgba(227,234,229,.30);
+  color-scheme:dark;
+}
+*{box-sizing:border-box}
+html,body{height:100%}
+body{margin:0;background:var(--ground);color:var(--ink);font:400 14px/1.45 var(--font);}
+::selection{background:var(--accent-soft)}
+button,input,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--accent);outline-offset:2px;border-radius:4px}
+
+.app{display:grid;grid-template-columns:248px minmax(0,1fr);min-height:100dvh}
+/* Owner rail */
+.rail{padding:22px 16px;display:flex;flex-direction:column;gap:22px;border-right:1px solid var(--rule)}
+.brand{display:flex;align-items:center;gap:10px;font-weight:700;font-size:16px;letter-spacing:-.01em}
+.brand svg{flex:none}
+.rail h2{margin:0 0 8px;font-size:13px;font-weight:600;color:var(--muted)}
+.owners{display:flex;flex-direction:column;gap:2px;margin:0;padding:0;list-style:none}
+.owner{display:grid;grid-template-columns:18px 26px 1fr;align-items:center;gap:8px;padding:7px 8px;border-radius:8px;cursor:pointer}
+.owner:hover{background:var(--sheet-2)}
+.owner input{accent-color:var(--accent);width:16px;height:16px;margin:0}
+.av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font-size:11px;font-weight:700;color:#fff}
+.av.org{border-radius:7px}
+.owner .who{min-width:0}
+.owner .who b{display:block;font-weight:500;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.owner .who span{font-size:12px;color:var(--muted)}
+.owner .sz{font-size:12px;color:var(--muted)}
+.owner.off .who b,.owner.off .sz{color:var(--faint)}
+.scan{font-size:12px;color:var(--muted);display:flex;flex-direction:column;gap:6px}
+.scan .track{height:4px;border-radius:2px;background:var(--rule-soft);overflow:hidden}
+.scan .fill{height:100%;width:90%;background:var(--accent);border-radius:2px}
+.rail .foot{margin-top:auto;font-size:12px;color:var(--muted)}
+.rail .foot a{color:var(--accent-ink)}
+
+/* Main */
+.main{padding:18px 28px 40px;display:flex;flex-direction:column;gap:18px;min-width:0}
+.tabs{display:flex;gap:4px;border-bottom:1px solid var(--rule)}
+.tab{appearance:none;border:0;background:none;padding:10px 14px;font-weight:500;color:var(--muted);border-bottom:2px solid transparent;margin-bottom:-1px;cursor:pointer;display:flex;gap:8px;align-items:center}
+.tab[aria-selected="true"]{color:var(--ink);border-color:var(--ink)}
+.tab .n{font-size:12px;color:var(--muted);background:var(--sheet-2);padding:1px 7px;border-radius:999px}
+
+/* Storage map: the one bold element */
+.map{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;padding:22px 22px 18px;display:flex;flex-direction:column;gap:14px}
+.map-head{display:flex;flex-wrap:wrap;align-items:baseline;gap:6px 18px}
+.map-head h1{margin:0;font-size:34px;line-height:1.05;font-weight:700;letter-spacing:-.025em}
+.map-head p{margin:0;color:var(--muted);max-width:60ch;text-wrap:pretty}
+.map-head p strong{color:var(--ink);font-weight:600}
+.blocks{display:flex;gap:2px;height:64px;border-radius:8px;overflow:hidden}
+.blk{position:relative;min-width:6px;background:var(--c);border:0;padding:0;cursor:pointer;transition:filter .15s ease}
+.blk:hover{filter:brightness(1.08)}
+.blk.expired{background:repeating-linear-gradient(135deg,var(--hatch) 0 2px,transparent 2px 6px),var(--sheet-2)}
+.blk.sel{box-shadow:inset 0 0 0 3px var(--ink)}
+.blk.sel::after{content:"";position:absolute;inset:auto 0 0 0;height:6px;background:var(--ink)}
+.blk.dim{opacity:.35}
+.legend{display:flex;flex-wrap:wrap;gap:6px 18px;font-size:12px;color:var(--muted);margin:0;padding:0;list-style:none}
+.legend li{display:flex;align-items:center;gap:6px}
+.legend i{width:10px;height:10px;border-radius:3px;background:var(--c)}
+.legend i.h{background:repeating-linear-gradient(135deg,var(--hatch) 0 2px,transparent 2px 5px),var(--sheet-2);outline:1px solid var(--rule)}
+
+/* Filters */
+.filters{display:flex;flex-wrap:wrap;gap:10px;align-items:center}
+.field{display:flex;align-items:center;gap:8px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:0 10px;height:36px}
+.field label{font-size:12px;color:var(--muted);white-space:nowrap}
+.field input,.field select{border:0;background:transparent;height:34px;outline:none;min-width:0}
+.field input[type=number]{width:52px}
+.field.grow{flex:1 1 220px}
+.field.grow input{width:100%}
+.filters .count{margin-left:auto;font-size:13px;color:var(--muted)}
+
+/* Table */
+.tablewrap{background:var(--sheet);border:1px solid var(--rule);border-radius:14px;overflow:auto}
+table{width:100%;border-collapse:collapse;min-width:860px}
+th,td{padding:0 12px;height:46px;text-align:left;border-bottom:1px solid var(--rule-soft);white-space:nowrap}
+th{height:40px;font-size:12px;font-weight:500;color:var(--muted);position:sticky;top:0;background:var(--sheet)}
+th button{all:unset;cursor:pointer;display:inline-flex;gap:4px;align-items:center}
+th button[aria-sort] {color:var(--ink);font-weight:600}
+tr:last-child td{border-bottom:0}
+td.num,th.num{text-align:right}
+td.chk,th.chk{width:40px;padding-right:0}
+td input[type=checkbox],th input[type=checkbox]{accent-color:var(--accent);width:16px;height:16px;margin:0;display:block}
+tbody tr:hover{background:var(--sheet-2)}
+tbody tr.sel{background:var(--accent-soft)}
+.repo{display:flex;align-items:center;gap:8px}
+.repo i{width:8px;height:8px;border-radius:2px;background:var(--c);flex:none}
+.repo span{color:var(--muted)}
+.name b{font-weight:600}
+.name small{display:block;font-size:12px;color:var(--muted)}
+.branch{font-size:12px;color:var(--muted);max-width:170px;overflow:hidden;text-overflow:ellipsis;display:inline-block;vertical-align:middle}
+.ret{display:flex;flex-direction:column;gap:5px;min-width:130px}
+.ret span{font-size:13px}
+.ret .t{height:3px;border-radius:2px;background:var(--rule-soft);overflow:hidden}
+.ret .t i{display:block;height:100%;background:var(--muted);border-radius:2px}
+.ret.soon span{color:var(--caution);font-weight:600}
+.ret.soon .t i{background:var(--caution)}
+.ret.gone span{color:var(--faint);text-decoration:line-through}
+tr.expired td:not(.chk){color:var(--faint)}
+tr.expired .name b{font-weight:500}
+.rowact{all:unset;cursor:pointer;color:var(--accent-ink);font-weight:500;font-size:13px}
+.rowact[disabled]{color:var(--faint);cursor:not-allowed}
+
+/* Bulk dock */
+.dock{position:sticky;bottom:16px;align-self:center;display:flex;align-items:center;gap:14px;background:var(--ink);color:var(--sheet);padding:10px 10px 10px 18px;border-radius:12px;box-shadow:0 10px 30px -12px rgba(0,0,0,.45);flex-wrap:wrap;max-width:100%}
+.dock .what{font-weight:600}
+.dock .what span{font-weight:400;opacity:.75}
+.dock button{appearance:none;border:0;border-radius:8px;height:34px;padding:0 14px;font-weight:600;cursor:pointer}
+.dock .dl{background:var(--sheet);color:var(--ink)}
+.dock .del{background:var(--danger);color:var(--on-danger)}
+.dock .clear{background:transparent;color:var(--sheet);opacity:.8;font-weight:500}
+.confirm{display:none;align-items:center;gap:12px}
+.dock.confirming .confirm{display:flex}
+.dock.confirming .acts{display:none}
+.acts{display:flex;gap:8px}
+
+.theme{position:fixed;right:14px;top:14px;font-size:12px;background:var(--sheet);border:1px solid var(--rule);border-radius:8px;padding:6px 10px;cursor:pointer}
+
+@media (max-width:900px){
+  .app{grid-template-columns:1fr}
+  .rail{border-right:0;border-bottom:1px solid var(--rule);padding-inline:16px}
+  .main{padding-inline:16px}
+  .map-head h1{font-size:26px}
+}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="app">
+  <aside class="rail" aria-label="Owners">
+    <div class="brand">
+      <svg width="26" height="26" viewBox="0 0 26 26" aria-hidden="true"><rect x="2" y="14" width="22" height="9" rx="2" fill="var(--accent)"/><rect x="2" y="3" width="10" height="9" rx="2" fill="var(--accent)" opacity=".55"/><rect x="14" y="3" width="10" height="9" rx="2" fill="var(--accent)" opacity=".3"/></svg>
+      Artifact Shelf
+    </div>
+    <div>
+      <h2>Accounts and organizations</h2>
+      <ul class="owners" id="owners"></ul>
+    </div>
+    <div class="scan" role="status" aria-live="polite">
+      <span>Scanning repositories: 47 of 52</span>
+      <div class="track"><div class="fill"></div></div>
+      <span>acme-labs/infra-terraform…</span>
+    </div>
+    <div class="foot">Signed in with a personal access token. <a href="#">Settings</a></div>
+  </aside>
+
+  <main class="main">
+    <div class="tabs" role="tablist">
+      <button class="tab" role="tab" aria-selected="true">Artifacts <span class="n" id="tabCount">12</span></button>
+      <button class="tab" role="tab" aria-selected="false">Issues <span class="n">38</span></button>
+    </div>
+
+    <section class="map" aria-labelledby="total">
+      <div class="map-head">
+        <h1 id="total">—</h1>
+        <p id="sentence"></p>
+      </div>
+      <div class="blocks" id="blocks" aria-label="Storage map: each block is one artifact, sized by bytes"></div>
+      <ul class="legend" id="legend"></ul>
+    </section>
+
+    <div class="filters" role="search">
+      <div class="field grow"><label for="q">Repository</label><input id="q" placeholder="Filter by repository name"></div>
+      <div class="field"><label for="age">Older than</label><input id="age" type="number" value="0" min="0"><label for="age">days</label></div>
+      <div class="field"><label for="min">At least</label><input id="min" type="number" value="0" min="0"><label for="min">MB</label></div>
+      <div class="field"><label for="exp">Show</label><select id="exp"><option>All artifacts</option><option>Not expired</option><option>Expired only</option></select></div>
+    </div>
+
+    <div class="tablewrap">
+      <table>
+        <thead><tr>
+          <th class="chk"><input type="checkbox" id="all" aria-label="Select all visible artifacts"></th>
+          <th>Repository</th>
+          <th>Artifact</th>
+          <th class="num"><button>Size</button></th>
+          <th><button aria-sort="descending">Created ↓</button></th>
+          <th>Retention left</th>
+          <th></th>
+        </tr></thead>
+        <tbody id="rows"></tbody>
+      </table>
+    </div>
+
+    <div class="dock" id="dock" role="region" aria-label="Bulk actions">
+      <div class="what" id="selWhat"></div>
+      <div class="acts">
+        <button class="dl">Download</button>
+        <button class="del" id="delBtn">Delete…</button>
+        <button class="clear" id="clear">Clear</button>
+      </div>
+      <div class="confirm">
+        <span id="confirmText"></span>
+        <button class="del" id="reallyDel">Delete artifacts</button>
+        <button class="clear" id="cancelDel">Keep them</button>
+      </div>
+    </div>
+  </main>
+</div>
+<button class="theme" id="theme" aria-label="Toggle light and dark preview">Light / dark</button>
+
+<script>
+const TODAY = new Date("2026-10-30T12:00:00Z");
+const OWNERS = [
+  {login:"sora-builds", kind:"Personal account", org:false, hue:"#3A62B0", on:true},
+  {login:"acme-labs", kind:"Organization", org:true, hue:"#0E6B5C", on:true},
+  {login:"my-sideprojects", kind:"Organization", org:true, hue:"#A35F12", on:true},
+];
+const REPOS = {
+  "acme-labs/web-console":"--r1","acme-labs/data-pipeline":"--r2","acme-labs/mobile-app":"--r3",
+  "my-sideprojects/tile-game":"--r4","sora-builds/dotfiles":"--r5"
+};
+const ROWS = [
+  {repo:"acme-labs/web-console", name:"playwright-report", mb:148.6, created:"2026-10-29", expires:"2027-01-27", branch:"main", wf:"e2e"},
+  {repo:"acme-labs/web-console", name:"dist-bundle", mb:23.4, created:"2026-10-28", expires:"2027-01-26", branch:"feat/billing-page", wf:"build"},
+  {repo:"acme-labs/web-console", name:"coverage-lcov", mb:6.1, created:"2026-08-02", expires:"2026-10-31", branch:"main", wf:"test"},
+  {repo:"acme-labs/data-pipeline", name:"parquet-sample-export", mb:412.8, created:"2026-09-14", expires:"2026-12-13", branch:"main", wf:"nightly-export", sel:true},
+  {repo:"acme-labs/data-pipeline", name:"dbt-docs-site", mb:18.9, created:"2026-07-21", expires:"2026-10-19", branch:"release/2.4", wf:"docs", expired:true},
+  {repo:"acme-labs/data-pipeline", name:"test-results-junit", mb:1.2, created:"2026-10-30", expires:"2027-01-28", branch:"fix/null-partition", wf:"ci"},
+  {repo:"acme-labs/mobile-app", name:"android-release-apk", mb:96.3, created:"2026-10-21", expires:"2027-01-19", branch:"release/5.2.0", wf:"release"},
+  {repo:"acme-labs/mobile-app", name:"ios-simulator-build", mb:311.5, created:"2026-07-30", expires:"2026-10-28", branch:"main", wf:"ios", expired:true},
+  {repo:"acme-labs/mobile-app", name:"detox-screenshots", mb:54.0, created:"2026-10-03", expires:"2027-01-01", branch:"main", wf:"e2e"},
+  {repo:"my-sideprojects/tile-game", name:"webgl-build", mb:72.2, created:"2026-10-12", expires:"2026-11-11", branch:"main", wf:"pages"},
+  {repo:"my-sideprojects/tile-game", name:"wasm-profile-trace", mb:8.7, created:"2026-09-01", expires:"2026-10-01", branch:"perf/atlas-packing", wf:"profile", expired:true},
+  {repo:"sora-builds/dotfiles", name:"nix-closure-cache", mb:204.0, created:"2026-08-20", expires:"2026-11-18", branch:"main", wf:"cache", sel:true},
+];
+const day = s => new Date(s+"T12:00:00Z");
+const daysBetween = (a,b) => Math.round((b-a)/864e5);
+const fmtMB = mb => mb >= 1000 ? (mb/1000).toFixed(2)+" GB" : mb.toFixed(1)+" MB";
+const ago = s => { const d = daysBetween(day(s), TODAY); return d===0?"Today":d===1?"Yesterday":d+" days ago"; };
+
+function render(){
+  // owners
+  const ow = document.getElementById("owners"); ow.innerHTML="";
+  OWNERS.forEach(o=>{
+    const mb = ROWS.filter(r=>r.repo.startsWith(o.login+"/") && !r.expired).reduce((s,r)=>s+r.mb,0);
+    const li = document.createElement("li");
+    li.innerHTML = `<label class="owner ${o.on?"":"off"}"><input type="checkbox" ${o.on?"checked":""}><span class="av ${o.org?"org":""}" style="background:${o.hue}">${o.login.slice(0,2).toUpperCase()}</span><span class="who"><b>${o.login}</b><span>${o.kind} · ${fmtMB(mb)}</span></span></label>`;
+    li.querySelector("input").onchange = e => { o.on = e.target.checked; render(); };
+    ow.appendChild(li);
+  });
+  const visible = ROWS.filter(r => OWNERS.find(o=>r.repo.startsWith(o.login+"/")).on);
+  const live = visible.filter(r=>!r.expired);
+  const total = live.reduce((s,r)=>s+r.mb,0);
+  const sel = visible.filter(r=>r.sel);
+  const selMB = sel.reduce((s,r)=>s+r.mb,0);
+  const repos = new Set(visible.map(r=>r.repo));
+  document.getElementById("total").textContent = fmtMB(total)+" stored";
+  document.getElementById("tabCount").textContent = visible.length;
+  document.getElementById("sentence").innerHTML =
+    `${live.length} artifacts across ${repos.size} repositories, plus ${visible.length-live.length} expired that no longer count. `+
+    (sel.length ? `<strong>Deleting the ${sel.length} selected frees ${fmtMB(selMB)}.</strong>` : `Select artifacts to see how much space you free.`);
+  // blocks
+  const bl = document.getElementById("blocks"); bl.innerHTML="";
+  [...visible].sort((a,b)=>a.repo.localeCompare(b.repo)||b.mb-a.mb).forEach(r=>{
+    const b = document.createElement("button");
+    b.className = "blk"+(r.expired?" expired":"")+(r.sel?" sel":"");
+    b.style.flex = `${Math.max(r.mb,4)} 1 0`;
+    b.style.setProperty("--c",`var(${REPOS[r.repo]})`);
+    b.title = `${r.repo} · ${r.name} · ${fmtMB(r.mb)}${r.expired?" (expired)":""}`;
+    b.setAttribute("aria-label", b.title);
+    b.onclick = ()=>{ if(!r.expired){ r.sel=!r.sel; render(); } };
+    bl.appendChild(b);
+  });
+  const lg = document.getElementById("legend");
+  lg.innerHTML = [...repos].sort().map(k=>`<li><i style="--c:var(${REPOS[k]})"></i>${k}</li>`).join("")+`<li><i class="h"></i>Expired, already freed</li>`;
+  // rows
+  const tb = document.getElementById("rows"); tb.innerHTML="";
+  visible.slice().sort((a,b)=>day(b.created)-day(a.created)).forEach(r=>{
+    const left = daysBetween(TODAY, day(r.expires));
+    const span = daysBetween(day(r.created), day(r.expires));
+    const pct = Math.max(0, Math.min(100, left/span*100));
+    const cls = r.expired ? "gone" : left<=3 ? "soon" : "";
+    const label = r.expired ? `Expired ${-left} days ago` : left===1 ? "Expires tomorrow" : `${left} days left`;
+    const tr = document.createElement("tr");
+    tr.className = (r.sel?"sel ":"")+(r.expired?"expired":"");
+    const [owner,repo] = r.repo.split("/");
+    tr.innerHTML = `
+      <td class="chk"><input type="checkbox" ${r.sel?"checked":""} ${r.expired?"disabled":""} aria-label="Select ${r.name}"></td>
+      <td><div class="repo"><i style="--c:var(${REPOS[r.repo]})"></i><div><span>${owner}/</span>${repo}</div></div></td>
+      <td class="name"><b>${r.name}</b><small>${r.wf} · <span class="branch">${r.branch}</span></small></td>
+      <td class="num">${fmtMB(r.mb)}</td>
+      <td>${ago(r.created)}</td>
+      <td><div class="ret ${cls}"><span>${label}</span><div class="t"><i style="width:${pct}%"></i></div></div></td>
+      <td class="num"><button class="rowact" ${r.expired?"disabled title='Expired artifacts cannot be downloaded'":""}>Download</button></td>`;
+    tr.querySelector("input").onchange = e => { r.sel = e.target.checked; render(); };
+    tb.appendChild(tr);
+  });
+  const dock = document.getElementById("dock");
+  dock.style.display = sel.length ? "flex" : "none";
+  document.getElementById("selWhat").innerHTML = `${sel.length} selected <span>· ${fmtMB(selMB)}</span>`;
+  document.getElementById("confirmText").textContent = `Delete ${sel.length} artifacts (${fmtMB(selMB)})? This cannot be undone.`;
+}
+document.getElementById("all").onchange = e => { ROWS.forEach(r=>{ if(!r.expired) r.sel = e.target.checked; }); render(); };
+document.getElementById("clear").onclick = () => { ROWS.forEach(r=>r.sel=false); render(); };
+document.getElementById("delBtn").onclick = () => document.getElementById("dock").classList.add("confirming");
+document.getElementById("cancelDel").onclick = () => document.getElementById("dock").classList.remove("confirming");
+document.getElementById("reallyDel").onclick = () => document.getElementById("dock").classList.remove("confirming");
+document.getElementById("theme").onclick = () => {
+  const r = document.documentElement; const dark = r.dataset.theme ? r.dataset.theme==="dark" : matchMedia("(prefers-color-scheme: dark)").matches;
+  r.dataset.theme = dark ? "light" : "dark";
+};
+render();
+</script>
+</body>
+</html>
