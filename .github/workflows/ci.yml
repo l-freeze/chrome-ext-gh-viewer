@@ -30,4 +30,3 @@ jobs:
           # WXT の出力先 .output/ はドットで始まるため、既定では対象外になる
           include-hidden-files: true
           if-no-files-found: error
-          retention-days: 30
