@@ -163,6 +163,18 @@ export const en = {
   "dispatch.openOnGitHub": "Open on GitHub",
   "dispatch.failed": "Could not start the run.",
 
+  "permissions.title": "The token may be missing these permissions:",
+  "permissions.titleFromGitHub": "GitHub says this needs:",
+  "permissions.fineGrained": "Fine-grained token",
+  "permissions.classic": "Classic token / OAuth (scopes)",
+  "permissions.anyOf": "Any one of these sets:",
+  "permissions.anyScope": "Any one of these scopes:",
+  "permissions.openSettings": "Edit tokens",
+  "permissions.level.read": "Read-only",
+  "permissions.level.write": "Read and write",
+  "permissions.level.admin": "Admin",
+  "permissions.orgNote": "If the token already has them, the organization may be restricting this token or app, or the token may not include this repository.",
+
   "settings.title": "Settings",
   "settings.method": "How to connect",
   "settings.method.oauth": "Sign in with GitHub",

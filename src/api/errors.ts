@@ -36,6 +36,13 @@ export interface GitHubApiErrorInit {
   /** SAML SSO の承認ページ */
   ssoUrl?: string;
   documentationUrl?: string;
+  /**
+   * X-Accepted-GitHub-Permissions の内容。Fine-grained PAT / GitHub App に必要な権限の組み合わせで、
+   * どれか 1 組を満たせばよい。例: [["contents=read"]]
+   */
+  acceptedPermissions?: string[][];
+  /** X-Accepted-OAuth-Scopes の内容。Classic PAT / OAuth で受け付けるスコープ */
+  acceptedScopes?: string[];
   cause?: unknown;
 }
 
@@ -48,6 +55,8 @@ export class GitHubApiError extends Error {
   readonly retryAfterSec: number | undefined;
   readonly ssoUrl: string | undefined;
   readonly documentationUrl: string | undefined;
+  readonly acceptedPermissions: string[][] | undefined;
+  readonly acceptedScopes: string[] | undefined;
 
   constructor(init: GitHubApiErrorInit) {
     super(init.message, init.cause === undefined ? undefined : { cause: init.cause });
@@ -58,6 +67,8 @@ export class GitHubApiError extends Error {
     this.retryAfterSec = init.retryAfterSec;
     this.ssoUrl = init.ssoUrl;
     this.documentationUrl = init.documentationUrl;
+    this.acceptedPermissions = init.acceptedPermissions;
+    this.acceptedScopes = init.acceptedScopes;
   }
 }
 

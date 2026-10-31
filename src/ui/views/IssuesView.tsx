@@ -46,6 +46,7 @@ export function IssuesView(props: { state: IssuesState }) {
       <Failures
         title={t("failures.ownersTitle", { count: s.failures().length })}
         items={s.failures().map((f) => ({ key: f.owner.login, label: f.owner.login, error: f.error! }))}
+        operation="issues.search"
       />
       <Show when={s.truncatedOwners().length > 0}>
         <p class="notice">

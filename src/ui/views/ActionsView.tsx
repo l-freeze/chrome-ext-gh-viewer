@@ -37,6 +37,7 @@ export function ActionsView(props: { state: WorkflowsState; onRun: (target: Disp
       <Failures
         title={t("failures.title", { count: s.failures().length })}
         items={s.failures().map((f) => ({ key: String(f.repo.id), label: f.repo.fullName, error: f.error }))}
+        operation="workflows.list"
       />
 
       <div class="table-wrap">

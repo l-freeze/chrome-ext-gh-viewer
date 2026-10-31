@@ -1,6 +1,7 @@
 import { createEffect, For, Match, Show, Switch, type ParentProps } from "solid-js";
 import type { DispatchInput } from "../../domain/workflows";
 import { Icon } from "../components/Icon";
+import { PermissionHint } from "../components/PermissionHint";
 import { errorText } from "../errors";
 import { useDeps } from "../state/context";
 import type { DispatchPhase, DispatchState } from "../state/dispatch";
@@ -84,6 +85,7 @@ export function DispatchDialog(props: { state: DispatchState }) {
                 {(st) => (
                   <>
                     <p class="error" role="alert">{errorText(t, st().error)}</p>
+                    <PermissionHint error={st().error} operation="workflow.read" />
                     <Footer>
                       <button type="button" class="button" onClick={() => s.close()}>
                         {t("action.close")}
@@ -176,9 +178,12 @@ export function DispatchDialog(props: { state: DispatchState }) {
                     </dl>
                     <Show when={st().phase === "failed" && (st() as Phase<"failed">)}>
                       {(f) => (
-                        <p class="error" role="alert">
-                          {t("dispatch.failed")} {errorText(t, f().error)}
-                        </p>
+                        <>
+                          <p class="error" role="alert">
+                            {t("dispatch.failed")} {errorText(t, f().error)}
+                          </p>
+                          <PermissionHint error={f().error} operation="workflow.dispatch" />
+                        </>
                       )}
                     </Show>
                     <Footer>

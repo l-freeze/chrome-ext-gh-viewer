@@ -159,6 +159,18 @@ export const ja: Messages = {
   "dispatch.openOnGitHub": "GitHub で開く",
   "dispatch.failed": "実行を開始できませんでした。",
 
+  "permissions.title": "トークンに次の権限が足りない可能性があります:",
+  "permissions.titleFromGitHub": "GitHub によると、次の権限が必要です:",
+  "permissions.fineGrained": "Fine-grained トークン",
+  "permissions.classic": "Classic トークン / OAuth（スコープ）",
+  "permissions.anyOf": "次のいずれかの組み合わせ:",
+  "permissions.anyScope": "次のいずれかのスコープ:",
+  "permissions.openSettings": "トークンを編集",
+  "permissions.level.read": "Read-only（読み取り）",
+  "permissions.level.write": "Read and write（読み書き）",
+  "permissions.level.admin": "Admin（管理）",
+  "permissions.orgNote": "すでに付けている場合は、Organization がこのトークンや App を制限しているか、トークンの対象にこのリポジトリが入っていない可能性があります。",
+
   "settings.title": "設定",
   "settings.method": "接続方法",
   "settings.method.oauth": "GitHub でログイン",

@@ -3,9 +3,10 @@ import type { Artifact } from "../../api/types";
 import { expiryState, isExpired, repoKey, STALE_DAYS, type ArtifactSortKey } from "../../domain/artifacts";
 import { formatBytes, formatDate, formatPercent } from "../../domain/format";
 import { Failures } from "../components/Failures";
+import { PermissionHint } from "../components/PermissionHint";
 import { Icon } from "../components/Icon";
 import { errorText } from "../errors";
-import type { ArtifactsState } from "../state/artifacts";
+import type { ArtifactsState, Notice } from "../state/artifacts";
 import { useDeps } from "../state/context";
 import type { WorkspaceState } from "../state/workspace";
 
@@ -22,6 +23,7 @@ export function ArtifactsView(props: { state: ArtifactsState; ws: WorkspaceState
         <Failures
           title={t("failures.title", { count: s.failures().length })}
           items={s.failures().map((f) => ({ key: String(f.repo.id), label: f.repo.fullName, error: f.error }))}
+          operation="artifacts.list"
         />
         <Filters state={s} />
         <BulkBar state={s} />
@@ -288,6 +290,13 @@ export function ArtifactsView(props: { state: ArtifactsState; ws: WorkspaceState
               }
             </Match>
           </Switch>
+          <Show when={sel().count === 0 && notice()?.kind === "deleteFailed" && (notice() as Extract<Notice, { kind: "deleteFailed" }>)}>
+            {(n) => (
+              <div class="bulkbar__detail">
+                <PermissionHint error={n().errors[0]!} operation="artifacts.delete" />
+              </div>
+            )}
+          </Show>
         </div>
       </Show>
     );

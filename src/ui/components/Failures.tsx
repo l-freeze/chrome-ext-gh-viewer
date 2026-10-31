@@ -1,8 +1,10 @@
 import { For, Show } from "solid-js";
 import type { GitHubApiError } from "../../api/errors";
+import type { Operation } from "../../domain/permissions";
 import { errorText } from "../errors";
 import { useDeps } from "../state/context";
 import { Icon } from "./Icon";
+import { PermissionHint } from "./PermissionHint";
 
 export interface FailureItem {
   key: string;
@@ -11,7 +13,7 @@ export interface FailureItem {
 }
 
 /** 読み込めなかったリポジトリ・所有者の一覧。理由ごとの対処も示す */
-export function Failures(props: { title: string; items: FailureItem[] }) {
+export function Failures(props: { title: string; items: FailureItem[]; operation?: Operation }) {
   const { i18n } = useDeps();
   return (
     <Show when={props.items.length > 0}>
@@ -32,6 +34,9 @@ export function Failures(props: { title: string; items: FailureItem[] }) {
                       {i18n.t("error.sso_link")}
                     </a>
                   )}
+                </Show>
+                <Show when={props.operation}>
+                  {(op) => <PermissionHint error={item.error} operation={op()} />}
                 </Show>
               </li>
             )}
