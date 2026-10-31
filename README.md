@@ -7,6 +7,24 @@
 - Issue は所有者ごとに検索し、リポジトリ単位でまとめて表示します（現在は表示のみ）
 - 画面は英語と日本語。ブラウザの言語に合わせ、どちらでもなければ英語になります
 
+## 手動インストール
+
+Chrome ウェブストアには未公開のため、GitHub Actions がビルドした ZIP を手動で読み込みます。
+
+1. このリポジトリの Releases から `master build`（タグ `master-build`）を開き、`chrome-extension.zip` をダウンロードします。`master` に push されるたびに最新のビルドに差し替わります。
+2. ZIP を展開し、できたフォルダを消さない場所に置きます。Chrome はこのフォルダから拡張機能を読み込み続けます。
+3. Chrome で `chrome://extensions` を開き、右上の「デベロッパー モード」をオンにします。
+4. 「パッケージ化されていない拡張機能を読み込む」を押し、展開したフォルダ（`manifest.json` が入っているフォルダ）を選びます。
+5. ツールバーの拡張機能アイコンを押すと管理画面が開きます。必要ならピン留めしてください。
+
+このビルドには OAuth App の Client ID が入っていないため、接続方法は Personal Access Token だけです。
+
+### 更新
+
+新しい `chrome-extension.zip` をダウンロードし、手順 2 のフォルダの中身を置き換えてから、`chrome://extensions` で拡張機能の再読み込みボタン（円形の矢印）を押します。
+
+同じフォルダから読み込む限り、設定と登録したトークンは引き継がれます。別のフォルダから読み込むと別の拡張機能として扱われ、設定とトークンは引き継がれません。
+
 ## 接続方法
 
 | 方式 | 内容 |
@@ -35,7 +53,7 @@ echo "WXT_GITHUB_CLIENT_ID=<your client id>" > .env.local
 | コマンド | 内容 |
 |---|---|
 | `npm run build` | `.output/chrome-mv3/` にビルド。`chrome://extensions` の「パッケージ化されていない拡張機能を読み込む」で読み込めます |
-| `npm run zip` | Chrome Web Store 提出用の ZIP を作成 |
+| `npm run zip` | `.output/` に配布用の ZIP を作成（CI はこれを Release に置きます） |
 | `npm run typecheck` | 型チェック |
 | `npm test` | 単体テスト（Vitest） |
 | `npm run e2e` | ビルドした拡張機能を Chromium に読み込み、GitHub API を偽の応答に差し替えて画面を操作するテスト（Playwright が必要） |
