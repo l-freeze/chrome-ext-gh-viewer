@@ -1,0 +1,30 @@
+name: CI
+
+on:
+  push:
+    branches: [master]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm run typecheck
+      - run: npm test
+      - run: npm run zip
+      # ビルドした拡張機能の ZIP。Chrome の「パッケージ化されていない拡張機能」として読み込むには展開して使う
+      - uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension
+          path: .output/*-chrome.zip
+          retention-days: 30

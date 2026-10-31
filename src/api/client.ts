@@ -48,11 +48,14 @@ export class GitHubClient {
   async inspectToken(token: string, options: CallOptions = {}): Promise<TokenInfo> {
     const { data, response } = await this.http.json("/user", options);
     const scopesHeader = response.headers.get("x-oauth-scopes");
+    const kind = tokenKindFromPrefix(token);
+    // スコープを持つのは Classic PAT と OAuth トークンだけ。
+    // スコープを持たないトークンにも空の X-OAuth-Scopes が付くことがあるので、ヘッダーの有無では判断しない
+    const hasScopes = kind === "classic-pat" || kind === "oauth";
     return {
-      kind: tokenKindFromPrefix(token),
+      kind,
       user: decode(() => decodeOwner(data, "user")),
-      // Fine-grained PAT にはこのヘッダーが付かない
-      scopes: scopesHeader === null ? null : splitScopes(scopesHeader),
+      scopes: hasScopes && scopesHeader !== null ? splitScopes(scopesHeader) : null,
       expiresAt: parseTokenExpiration(response.headers.get("github-authentication-token-expiration")),
     };
   }
