@@ -15,7 +15,7 @@ const json = (route, body, status = 200, headers = {}) =>
  * @param {string[]} log 受けたリクエストを記録する
  * @param {{ delayMs?: number }} options delayMs: アーティファクト一覧の応答を遅らせる（読み込み中の画面用）
  */
-function api(log, { delayMs = 0, dispatches = [] } = {}) {
+function api(log, { delayMs = 0, dispatches = [], control = { runs: structuredClone(fx.runsByRepo) } } = {}) {
   const artifacts = structuredClone(fx.artifactsByRepo);
   return async (route) => {
     const req = route.request();
@@ -64,7 +64,7 @@ function api(log, { delayMs = 0, dispatches = [] } = {}) {
         return json(route, { total_count: list.length, workflows: list });
       }
       if (m[3] === "actions/runs") {
-        const list = fx.runsByRepo[key] ?? [];
+        const list = control.runs[key] ?? [];
         return json(route, { total_count: list.length, workflow_runs: list });
       }
       if (m[3] === "branches") return json(route, [{ name: "master" }, { name: "legacy" }].map((b) => ({ ...b, commit: {}, protected: false })));
@@ -132,7 +132,15 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
   });
   const log = [];
   const dispatches = [];
-  await context.route("https://api.github.com/**", api(log, { delayMs, dispatches }));
+  // テストから偽 API の状態を変えるためのつまみ
+  const control = {
+    runs: structuredClone(fx.runsByRepo),
+    completeAllRuns() {
+      for (const list of Object.values(this.runs))
+        for (const run of list) if (run.status !== "completed") Object.assign(run, { status: "completed", conclusion: "success" });
+    },
+  };
+  await context.route("https://api.github.com/**", api(log, { delayMs, dispatches, control }));
   await context.route("https://github.com/login/**", oauth(log));
   await context.route("https://avatars.githubusercontent.com/**", (r) => r.fulfill({ status: 404 }));
   let [sw] = context.serviceWorkers();
@@ -143,7 +151,7 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
   page.on("pageerror", (e) => errors.push(String(e)));
   // 偽 API の 403/404 による読み込みエラーは想定どおりなので除く
   page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()));
-  return { context, page, id, log, errors, dispatches };
+  return { context, page, id, log, errors, dispatches, control };
 }
 
 module.exports = { launch };

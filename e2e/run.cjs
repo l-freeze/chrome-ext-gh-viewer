@@ -207,6 +207,34 @@ const step = async (name, fn) => {
     await context.close();
   }
 
+  // ---- 実行中のワークフローの状態の更新 ------------------------------------------
+  {
+    const { context, page, id, log, control } = await launch();
+    await step("Actions: 実行中のものがある間だけ 1 分おきに状態を取り直す", async () => {
+      // 時計を差し替え、1 分待つ代わりに早送りする
+      await page.clock.install();
+      await connect(page, id);
+      await page.goto(`chrome-extension://${id}/manager.html#actions`);
+      const ciRow = page.locator("tr", { has: page.getByRole("link", { name: "CI", exact: true }) });
+      await ciRow.getByText("In progress").waitFor();
+      const runsCalls = () => log.filter((l) => l.startsWith("GET /repos/acme-labs/web-console/actions/runs")).length;
+      const before = runsCalls();
+      control.completeAllRuns();
+      await page.clock.fastForward("00:59");
+      await page.waitForTimeout(300);
+      assert.equal(runsCalls(), before, "1 分たつまでは取り直さない");
+      await page.clock.fastForward("00:02");
+      await ciRow.getByText("Success").waitFor();
+      assert.equal(runsCalls(), before + 1);
+      // 実行中のものがなくなったら、それ以上は問い合わせない
+      await page.clock.fastForward("05:00");
+      await page.waitForTimeout(300);
+      assert.equal(runsCalls(), before + 1);
+      assert.equal(log.filter((l) => l.startsWith("GET /repos/acme-labs/data-pipeline/actions/runs")).length, 1);
+    });
+    await context.close();
+  }
+
   // ---- ダーク ---------------------------------------------------------------
   {
     const { context, page, id } = await launch({ colorScheme: "dark" });
