@@ -1,7 +1,13 @@
 // Actions タブの状態: リポジトリごとのワークフロー一覧と最新の実行。
 
-import { batch, createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
-import { listWorkflowsForRepos, type RepoWorkflowsResult, type WorkflowWithRun } from "../../api/aggregate";
+import { batch, createEffect, createMemo, createSignal, on, onCleanup, type Accessor } from "solid-js";
+import {
+  latestRunByWorkflow,
+  listWorkflowsForRepos,
+  mapWithConcurrency,
+  type RepoWorkflowsResult,
+  type WorkflowWithRun,
+} from "../../api/aggregate";
 import { GitHubApiError } from "../../api/errors";
 import type { Repository } from "../../api/types";
 import { toRepoRef } from "../../services/workspace";
@@ -13,6 +19,9 @@ export interface WorkflowGroup {
   key: string;
   workflows: WorkflowWithRun[];
 }
+
+/** 実行中・待機中の実行があるとき、状態を取り直す間隔 */
+export const RUNNING_POLL_INTERVAL_MS = 60_000;
 
 export function createWorkflowsState(_deps: AppDeps, ws: WorkspaceState, active: Accessor<boolean>) {
   const [results, setResults] = createSignal<ReadonlyMap<string, RepoWorkflowsResult>>(new Map());
@@ -69,6 +78,48 @@ export function createWorkflowsState(_deps: AppDeps, ws: WorkspaceState, active:
       if (isActive) void load(ws.selectedRepos().map((r) => r.repo), false);
     }),
   );
+
+  /** 最新の実行がまだ終わっていないワークフローを持つリポジトリ */
+  const reposWithRunning = createMemo(() =>
+    [...results().values()]
+      .filter((r): r is Extract<RepoWorkflowsResult, { ok: true }> => r.ok)
+      .filter((r) => r.workflows.some((w) => w.lastRun !== null && w.lastRun.status !== "completed"))
+      .map((r) => r.repo),
+  );
+
+  /** 実行履歴だけを取り直し、各ワークフローの最新の実行を差し替える（ワークフロー一覧は取り直さない） */
+  async function pollRuns(repos: readonly Repository[]) {
+    const router = ws.router();
+    if (!router) return;
+    await mapWithConcurrency(repos, 4, async (repo) => {
+      try {
+        const runs = await router.forRepo(toRepoRef(repo)).listRecentRuns(toRepoRef(repo));
+        const latest = latestRunByWorkflow(runs);
+        setResults((prev) => {
+          const cur = prev.get(keyOf(repo));
+          if (!cur?.ok) return prev;
+          const workflows = cur.workflows.map((w) => ({ ...w, lastRun: latest.get(w.workflow.id) ?? w.lastRun }));
+          return new Map(prev).set(keyOf(repo), { ...cur, workflows });
+        });
+      } catch {
+        // 一時的な失敗は次の回に任せる（一覧の表示はそのまま）
+      }
+    });
+  }
+
+  // タブを開いていて、終わっていない実行があるときだけ、間隔をあけて取り直す。
+  // 1 回終わるたびに pollTick を進めて次の回を予約する（取り直しが失敗しても止まらないように）。
+  // ブラウザのタブが裏にあるときは問い合わせず、次の回に回す
+  const [pollTick, setPollTick] = createSignal(0);
+  createEffect(() => {
+    pollTick();
+    if (!active() || reposWithRunning().length === 0) return;
+    const timer = setTimeout(async () => {
+      if (document.visibilityState !== "hidden") await pollRuns(reposWithRunning());
+      setPollTick((n) => n + 1);
+    }, RUNNING_POLL_INTERVAL_MS);
+    onCleanup(() => clearTimeout(timer));
+  });
 
   const selectedResults = createMemo(() =>
     ws
