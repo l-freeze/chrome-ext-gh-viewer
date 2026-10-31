@@ -3,7 +3,7 @@
 
 import type { GitHubClient } from "./client";
 import { GitHubApiError } from "./errors";
-import type { Artifact, Issue, Owner, Repository } from "./types";
+import type { Artifact, Issue, Owner, Repository, Workflow, WorkflowRun } from "./types";
 
 export type RepoArtifactsResult =
   | { repo: Repository; ok: true; artifacts: Artifact[] }
@@ -75,6 +75,67 @@ export async function deleteArtifacts(
     }
     done++;
     options.onProgress?.({ done, total: artifacts.length }, result);
+    return result;
+  });
+}
+
+// ---------------------------------------------------------------------------
+// ワークフロー
+
+export interface WorkflowWithRun {
+  workflow: Workflow;
+  /** 最近の実行履歴（1 ページ分）の中での最新の実行。なければ null */
+  lastRun: WorkflowRun | null;
+}
+
+export type RepoWorkflowsResult =
+  | { repo: Repository; ok: true; workflows: WorkflowWithRun[] }
+  | { repo: Repository; ok: false; error: GitHubApiError };
+
+export interface ListWorkflowsOptions {
+  concurrency?: number;
+  signal?: AbortSignal;
+  onProgress?: (progress: Progress, result: RepoWorkflowsResult) => void;
+}
+
+/** 新しい順に並んだ実行履歴から、ワークフローごとの最新の実行を取り出す */
+export function latestRunByWorkflow(runs: readonly WorkflowRun[]): Map<number, WorkflowRun> {
+  const latest = new Map<number, WorkflowRun>();
+  for (const run of runs) {
+    const cur = latest.get(run.workflowId);
+    if (!cur || Date.parse(run.createdAt) > Date.parse(cur.createdAt)) latest.set(run.workflowId, run);
+  }
+  return latest;
+}
+
+/** リポジトリごとにワークフローと最新の実行を取得する。ワークフローがなければ実行履歴は取りにいかない */
+export async function listWorkflowsForRepos(
+  client: ClientFor<Repository>,
+  repos: readonly Repository[],
+  options: ListWorkflowsOptions = {},
+): Promise<RepoWorkflowsResult[]> {
+  let done = 0;
+  return mapWithConcurrency(repos, options.concurrency ?? 4, async (repo) => {
+    const ref = { owner: repo.owner.login, name: repo.name };
+    const call = options.signal ? { signal: options.signal } : {};
+    let result: RepoWorkflowsResult;
+    try {
+      const c = resolve(client, repo);
+      const workflows = await c.listRepoWorkflows(ref, call);
+      const latest =
+        workflows.length > 0 ? latestRunByWorkflow(await c.listRecentRuns(ref, call)) : new Map<number, WorkflowRun>();
+      result = {
+        repo,
+        ok: true,
+        workflows: workflows.map((workflow) => ({ workflow, lastRun: latest.get(workflow.id) ?? null })),
+      };
+    } catch (e) {
+      const error = toApiError(e);
+      if (error.kind === "aborted") throw error;
+      result = { repo, ok: false, error };
+    }
+    done++;
+    options.onProgress?.({ done, total: repos.length }, result);
     return result;
   });
 }

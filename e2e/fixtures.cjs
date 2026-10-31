@@ -11,7 +11,7 @@ const orgs = [user("acme-labs", "Organization", 2), user("locked-corp", "Organiz
 
 const repo = (owner, name, id, ownerType = "Organization") => ({
   id, name, full_name: `${owner.login}/${name}`, owner, private: true, archived: false,
-  html_url: `https://github.com/${owner.login}/${name}`, pushed_at: iso(1), _type: ownerType,
+  html_url: `https://github.com/${owner.login}/${name}`, pushed_at: iso(1), default_branch: "master", _type: ownerType,
 });
 const repos = [
   repo(orgs[0], "data-pipeline", 11),
@@ -80,4 +80,64 @@ const issuesByOwner = {
   ],
 };
 
-module.exports = { viewer, orgs, repos, artifactsByRepo, issuesByOwner };
+let wfId = 700;
+const workflow = (repoKey, name, file, state = "active") => ({
+  id: wfId++, node_id: `W_${wfId}`, name, path: `.github/workflows/${file}`, state,
+  created_at: iso(300), updated_at: iso(30), url: "", badge_url: "",
+  html_url: `https://github.com/${repoKey}/actions/workflows/${file}`,
+});
+const workflowsByRepo = {
+  "acme-labs/web-console": [
+    workflow("acme-labs/web-console", "CI", "ci.yml"),
+    workflow("acme-labs/web-console", "Deploy", "deploy.yml"),
+    workflow("acme-labs/web-console", "Nightly cleanup", "nightly.yml", "disabled_manually"),
+  ],
+  "acme-labs/data-pipeline": [workflow("acme-labs/data-pipeline", "Nightly export", "export.yml")],
+  "octo-dev/tile-game": [workflow("octo-dev/tile-game", "Release", "release.yml")],
+};
+let runId = 9000;
+const run = (repoKey, wf, ageDays, status, conclusion, branch = "master", event = "push") => ({
+  id: runId++, workflow_id: wf.id, run_number: runId - 8990, status, conclusion, event, head_branch: branch,
+  actor: user("mona-fake", "User", 99), created_at: iso(ageDays), updated_at: iso(ageDays),
+  html_url: `https://github.com/${repoKey}/actions/runs/${runId}`,
+});
+const [ci, deploy] = workflowsByRepo["acme-labs/web-console"];
+const runsByRepo = {
+  "acme-labs/web-console": [
+    run("acme-labs/web-console", ci, 0, "in_progress", null, "feat/billing-page"),
+    run("acme-labs/web-console", ci, 1, "completed", "success"),
+    run("acme-labs/web-console", deploy, 3, "completed", "failure", "master", "workflow_dispatch"),
+  ],
+  "acme-labs/data-pipeline": [run("acme-labs/data-pipeline", workflowsByRepo["acme-labs/data-pipeline"][0], 1, "completed", "success")],
+};
+const workflowYaml = {
+  ".github/workflows/ci.yml": "name: CI\non:\n  push:\n  pull_request:\njobs: {}\n",
+  ".github/workflows/deploy.yml": [
+    "name: Deploy",
+    "on:",
+    "  workflow_dispatch:",
+    "    inputs:",
+    "      environment:",
+    "        description: Where to deploy",
+    "        type: environment",
+    "        required: true",
+    "      level:",
+    "        description: Log level",
+    "        type: choice",
+    "        options: [info, debug, trace]",
+    "      dry_run:",
+    "        description: Only print what would change",
+    "        type: boolean",
+    "        default: true",
+    "      replicas:",
+    "        type: number",
+    "        default: 2",
+    "      note:",
+    "        description: Shown in the run summary",
+    "jobs: {}",
+  ].join("\n"),
+  ".github/workflows/export.yml": "on:\n  schedule:\n    - cron: '0 3 * * *'\n  workflow_dispatch:\njobs: {}\n",
+  ".github/workflows/release.yml": "on: workflow_dispatch\njobs: {}\n",
+};
+
+module.exports = { viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml };

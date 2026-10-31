@@ -5,15 +5,17 @@ import { Icon } from "./components/Icon";
 import type { ArtifactsState } from "./state/artifacts";
 import { useDeps } from "./state/context";
 import type { IssuesState } from "./state/issues";
+import type { WorkflowsState } from "./state/workflows";
 import type { WorkspaceState } from "./state/workspace";
 
-export type Route = "artifacts" | "issues" | "settings";
+export type Route = "artifacts" | "actions" | "issues" | "settings";
 
 export function Header(props: {
   route: Route;
   ws: WorkspaceState;
   artifacts: ArtifactsState;
   issues: IssuesState;
+  workflows: WorkflowsState;
   connected: boolean;
 }) {
   const { i18n } = useDeps();
@@ -22,7 +24,12 @@ export function Header(props: {
 
   const progress = () => {
     if (props.ws.loading()) return { label: t("loading.repos"), ratio: null };
-    const p = props.route === "issues" ? props.issues.progress() : props.artifacts.progress();
+    const p =
+      props.route === "issues"
+        ? props.issues.progress()
+        : props.route === "actions"
+          ? props.workflows.progress()
+          : props.artifacts.progress();
     if (!p) return null;
     return {
       label:
@@ -35,6 +42,7 @@ export function Header(props: {
 
   const refresh = () => {
     if (props.route === "issues") props.issues.refresh();
+    else if (props.route === "actions") props.workflows.refresh();
     else props.artifacts.refresh();
   };
 
@@ -50,6 +58,12 @@ export function Header(props: {
             {t("tab.artifacts")}
             <Show when={props.connected}>
               <span class="tab__count">{i18n.number(props.artifacts.artifacts().length)}</span>
+            </Show>
+          </a>
+          <a class="tab" href="#actions" aria-current={props.route === "actions" ? "page" : undefined}>
+            {t("tab.actions")}
+            <Show when={props.connected && props.workflows.total() > 0}>
+              <span class="tab__count">{i18n.number(props.workflows.total())}</span>
             </Show>
           </a>
           <a class="tab" href="#issues" aria-current={props.route === "issues" ? "page" : undefined}>

@@ -3,16 +3,20 @@ import { Header, type Route } from "./Header";
 import { createArtifactsState } from "./state/artifacts";
 import { createAuthState } from "./state/auth";
 import { DepsContext, type AppDeps } from "./state/context";
+import { createDispatchState } from "./state/dispatch";
 import { createIssuesState } from "./state/issues";
+import { createWorkflowsState } from "./state/workflows";
 import { createWorkspaceState } from "./state/workspace";
+import { ActionsView } from "./views/ActionsView";
 import { ArtifactsView } from "./views/ArtifactsView";
+import { DispatchDialog } from "./views/DispatchDialog";
 import { IssuesView } from "./views/IssuesView";
 import { SettingsView } from "./views/SettingsView";
 import { Failures } from "./components/Failures";
 import { errorText } from "./errors";
 import { GitHubApiError } from "../api/errors";
 
-const ROUTES: readonly Route[] = ["artifacts", "issues", "settings"];
+const ROUTES: readonly Route[] = ["artifacts", "actions", "issues", "settings"];
 
 function currentRoute(): Route {
   const hash = location.hash.replace(/^#/, "");
@@ -31,11 +35,20 @@ export function App(props: { deps: AppDeps }) {
   const ws = createWorkspaceState(deps, auth.active);
   const artifacts = createArtifactsState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
+  const workflows = createWorkflowsState(deps, ws, () => route() === "actions");
+  const dispatch = createDispatchState(ws, (repo) => workflows.refreshRepo(repo));
   const connected = () => auth.active().length > 0;
 
   return (
     <DepsContext.Provider value={deps}>
-      <Header route={route()} ws={ws} artifacts={artifacts} issues={issues} connected={connected()} />
+      <Header
+        route={route()}
+        ws={ws}
+        artifacts={artifacts}
+        issues={issues}
+        workflows={workflows}
+        connected={connected()}
+      />
       <main class="main">
         <Show when={auth.ready()}>
           <Switch>
@@ -74,6 +87,9 @@ export function App(props: { deps: AppDeps }) {
                 <Match when={route() === "issues"}>
                   <IssuesView state={issues} />
                 </Match>
+                <Match when={route() === "actions"}>
+                  <ActionsView state={workflows} onRun={(target) => void dispatch.open(target)} />
+                </Match>
                 <Match when={true}>
                   <ArtifactsView state={artifacts} ws={ws} />
                 </Match>
@@ -82,6 +98,7 @@ export function App(props: { deps: AppDeps }) {
           </Switch>
         </Show>
       </main>
+      <DispatchDialog state={dispatch} />
     </DepsContext.Provider>
   );
 }

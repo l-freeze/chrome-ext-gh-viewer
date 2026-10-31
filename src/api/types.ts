@@ -30,6 +30,7 @@ export interface RawRepository {
   archived: boolean;
   html_url: string;
   pushed_at: string | null;
+  default_branch?: string;
 }
 
 export interface RawArtifact {
@@ -127,6 +128,8 @@ export interface Repository {
   archived: boolean;
   htmlUrl: string;
   pushedAt: string | null;
+  /** 既定のブランチ。API が返さなければ null */
+  defaultBranch: string | null;
 }
 
 export interface WorkflowRunRef {
@@ -146,6 +149,34 @@ export interface Artifact {
   updatedAt: string | null;
   digest: string | null;
   workflowRun: WorkflowRunRef | null;
+}
+
+export interface Workflow {
+  id: number;
+  repo: RepoRef;
+  name: string;
+  /** .github/workflows/ci.yml など。GitHub が内部で動かすものは dynamic/... になる */
+  path: string;
+  /** active / disabled_manually / disabled_inactivity など */
+  state: string;
+  htmlUrl: string;
+}
+
+export interface WorkflowRun {
+  id: number;
+  workflowId: number;
+  repo: RepoRef;
+  runNumber: number;
+  /** queued / in_progress / completed など */
+  status: string | null;
+  /** success / failure / cancelled など。完了前は null */
+  conclusion: string | null;
+  event: string;
+  headBranch: string | null;
+  actor: UserRef | null;
+  createdAt: string;
+  updatedAt: string;
+  htmlUrl: string;
 }
 
 export interface Label {

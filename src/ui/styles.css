@@ -972,3 +972,152 @@ input[type="checkbox"] {
     display: none;
   }
 }
+
+/* ---- Actions ------------------------------------------------------------ */
+
+.toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.table--workflows td {
+  height: 42px;
+}
+.cell-workflow a {
+  color: var(--text);
+  font-weight: 500;
+}
+.run-cell {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.col-run {
+  width: 1%;
+  text-align: right;
+}
+.row--disabled td {
+  color: var(--text-3);
+}
+.run-badge {
+  display: inline-block;
+  padding: 0 7px;
+  border-radius: 10px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  background: var(--surface-2);
+  color: var(--text-2);
+}
+.run-badge--success {
+  background: #dafbe1;
+  color: #116329;
+}
+.run-badge--failure {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.run-badge--running,
+.run-badge--queued {
+  background: var(--warn-soft);
+  color: var(--warn);
+}
+@media (prefers-color-scheme: dark) {
+  .run-badge--success {
+    background: #12301c;
+    color: #6fdd8b;
+  }
+}
+
+/* ---- ダイアログ ----------------------------------------------------------- */
+
+.dialog {
+  width: min(560px, calc(100vw - 32px));
+  max-height: calc(100vh - 64px);
+  padding: 0;
+  border: 1px solid var(--border-strong);
+  border-radius: 8px;
+  background: var(--surface);
+  color: var(--text);
+  box-shadow: 0 12px 40px rgb(0 0 0 / 0.25);
+}
+.dialog::backdrop {
+  background: rgb(10 16 27 / 0.55);
+}
+.dialog__body {
+  padding: 18px 20px;
+}
+.dialog__header h2 {
+  font-size: 17px;
+}
+.dialog__header p {
+  margin: 4px 0 14px;
+}
+.dialog__footer {
+  display: flex;
+  justify-content: flex-end;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 18px;
+}
+.dispatch-form {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.form-row p {
+  margin: 4px 0 0;
+}
+.form-row__field {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.form-row__label {
+  font-size: 13px;
+  color: var(--text-2);
+}
+.form-row__check {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  cursor: pointer;
+}
+.form-row input[type="text"],
+.form-row select {
+  height: 34px;
+  padding: 0 10px;
+  border: 1px solid var(--border-strong);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+}
+.form-row--error input,
+.form-row--error select {
+  border-color: var(--danger);
+}
+.required {
+  color: var(--danger);
+  font-size: 12px;
+}
+.summary-list {
+  display: grid;
+  grid-template-columns: max-content minmax(0, 1fr);
+  gap: 6px 16px;
+  margin: 0;
+  padding: 12px 14px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+}
+.summary-list dt {
+  color: var(--text-3);
+}
+.summary-list dd {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
