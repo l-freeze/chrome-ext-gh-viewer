@@ -168,6 +168,16 @@ const step = async (name, fn) => {
     await dialog.getByRole("button", { name: "Close" }).click();
   });
 
+  await step("Actions: 権限不足のときは必要な権限を箇条書きで示す", async () => {
+    await page.getByRole("button", { name: "Run Nightly export" }).click();
+    const dialog = page.locator("dialog[open]");
+    await dialog.getByText("GitHub says this needs:").waitFor();
+    await dialog.locator(".permission-hint li", { hasText: "Contents: Read-only" }).waitFor();
+    await dialog.locator(".permission-hint li", { hasText: "repo" }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "14-dispatch-permission.png") });
+    await dialog.getByRole("button", { name: "Close" }).click();
+  });
+
   await step("Actions: ブランチを変えると、そのブランチの定義を読み直す", async () => {
     await page.getByRole("button", { name: "Run Release" }).click();
     const dialog = page.locator("dialog[open]");

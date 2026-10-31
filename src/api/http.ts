@@ -236,12 +236,16 @@ async function toApiError(
 ): Promise<GitHubApiError> {
   const { message, documentationUrl } = await readErrorBody(res);
   const status = res.status;
+  const acceptedPermissions = parseAcceptedPermissions(res.headers.get("x-accepted-github-permissions"));
+  const acceptedScopes = parseAcceptedScopes(res.headers.get("x-accepted-oauth-scopes"));
   const base = {
     status,
     url,
     message: message ?? `HTTP ${status}`,
     ...(rateLimit ? { rateLimit } : {}),
     ...(documentationUrl ? { documentationUrl } : {}),
+    ...(acceptedPermissions ? { acceptedPermissions } : {}),
+    ...(acceptedScopes ? { acceptedScopes } : {}),
   };
 
   if (status === 403 || status === 429) {
@@ -269,4 +273,31 @@ async function toApiError(
   if (status === 422) return new GitHubApiError({ ...base, kind: "validation" });
   if (status >= 500) return new GitHubApiError({ ...base, kind: "server" });
   return new GitHubApiError({ ...base, kind: "unexpected" });
+}
+
+/**
+ * X-Accepted-GitHub-Permissions（例: "contents=read,metadata=read; actions=write"）を読む。
+ * ";" で区切られた組のどれか 1 つを満たせばよい。権限の要らない旨だけの値なら undefined
+ */
+export function parseAcceptedPermissions(value: string | null): string[][] | undefined {
+  if (!value) return undefined;
+  const sets = value
+    .split(";")
+    .map((set) =>
+      set
+        .split(",")
+        .map((p) => p.trim())
+        .filter((p) => /^[a-z_]+=(read|write|admin)$/.test(p)),
+    )
+    .filter((set) => set.length > 0);
+  return sets.length > 0 ? sets : undefined;
+}
+
+/** X-Accepted-OAuth-Scopes（例: "repo, public_repo"）を読む */
+export function parseAcceptedScopes(value: string | null): string[] | undefined {
+  const scopes = (value ?? "")
+    .split(",")
+    .map((s) => s.trim())
+    .filter(Boolean);
+  return scopes.length > 0 ? scopes : undefined;
 }

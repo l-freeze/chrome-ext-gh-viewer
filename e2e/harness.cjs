@@ -74,6 +74,12 @@ function api(log, { delayMs = 0, dispatches = [] } = {}) {
     if (m) {
       // legacy ブランチには手動実行のトリガーがない想定
       if (url.searchParams.get("ref") === "legacy") return route.fulfill({ status: 200, body: "on: push\njobs: {}\n" });
+      // Contents の権限がないトークンを想定（GitHub は必要な権限をヘッダーで返す）
+      if (m[3].endsWith("export.yml"))
+        return json(route, { message: "Resource not accessible by personal access token" }, 403, {
+          "x-accepted-github-permissions": "contents=read",
+          "x-accepted-oauth-scopes": "repo",
+        });
       const text = fx.workflowYaml[decodeURIComponent(m[3])];
       return text ? route.fulfill({ status: 200, contentType: "text/plain", body: text }) : json(route, { message: "Not Found" }, 404);
     }
