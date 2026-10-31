@@ -15,7 +15,7 @@ const json = (route, body, status = 200, headers = {}) =>
  * @param {string[]} log 受けたリクエストを記録する
  * @param {{ delayMs?: number }} options delayMs: アーティファクト一覧の応答を遅らせる（読み込み中の画面用）
  */
-function api(log, { delayMs = 0 } = {}) {
+function api(log, { delayMs = 0, dispatches = [] } = {}) {
   const artifacts = structuredClone(fx.artifactsByRepo);
   return async (route) => {
     const req = route.request();
@@ -54,6 +54,33 @@ function api(log, { delayMs = 0 } = {}) {
         artifacts[key] = (artifacts[key] ?? []).filter((a) => a.id !== Number(m[3]));
         return route.fulfill({ status: 204 });
       }
+    }
+    m = /^\/repos\/([^/]+)\/([^/]+)\/(actions\/workflows|actions\/runs|branches|environments)$/.exec(p);
+    if (m) {
+      const key = `${m[1]}/${m[2]}`;
+      if (key === "locked-corp/secret-service") return json(route, { message: "Forbidden" }, 403);
+      if (m[3] === "actions/workflows") {
+        const list = fx.workflowsByRepo[key] ?? [];
+        return json(route, { total_count: list.length, workflows: list });
+      }
+      if (m[3] === "actions/runs") {
+        const list = fx.runsByRepo[key] ?? [];
+        return json(route, { total_count: list.length, workflow_runs: list });
+      }
+      if (m[3] === "branches") return json(route, [{ name: "master" }, { name: "legacy" }].map((b) => ({ ...b, commit: {}, protected: false })));
+      return json(route, { total_count: 2, environments: [{ id: 1, name: "staging" }, { id: 2, name: "production" }] });
+    }
+    m = /^\/repos\/([^/]+)\/([^/]+)\/contents\/(.+)$/.exec(p);
+    if (m) {
+      // legacy ブランチには手動実行のトリガーがない想定
+      if (url.searchParams.get("ref") === "legacy") return route.fulfill({ status: 200, body: "on: push\njobs: {}\n" });
+      const text = fx.workflowYaml[decodeURIComponent(m[3])];
+      return text ? route.fulfill({ status: 200, contentType: "text/plain", body: text }) : json(route, { message: "Not Found" }, 404);
+    }
+    m = /^\/repos\/([^/]+)\/([^/]+)\/actions\/workflows\/(\d+)\/dispatches$/.exec(p);
+    if (m && req.method() === "POST") {
+      dispatches.push({ repo: `${m[1]}/${m[2]}`, workflowId: Number(m[3]), body: JSON.parse(req.postData() ?? "{}") });
+      return route.fulfill({ status: 204 });
     }
     if (p === "/search/issues") {
       const q = url.searchParams.get("q");
@@ -98,7 +125,8 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, `--lang=${locale}`],
   });
   const log = [];
-  await context.route("https://api.github.com/**", api(log, { delayMs }));
+  const dispatches = [];
+  await context.route("https://api.github.com/**", api(log, { delayMs, dispatches }));
   await context.route("https://github.com/login/**", oauth(log));
   await context.route("https://avatars.githubusercontent.com/**", (r) => r.fulfill({ status: 404 }));
   let [sw] = context.serviceWorkers();
@@ -109,7 +137,7 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
   page.on("pageerror", (e) => errors.push(String(e)));
   // 偽 API の 403/404 による読み込みエラーは想定どおりなので除く
   page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()));
-  return { context, page, id, log, errors };
+  return { context, page, id, log, errors, dispatches };
 }
 
 module.exports = { launch };

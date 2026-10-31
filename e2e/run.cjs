@@ -25,7 +25,7 @@ const step = async (name, fn) => {
 
 (async () => {
   // ---- 英語・ライト ---------------------------------------------------------
-  const { context, page, id, log, errors } = await launch();
+  const { context, page, id, log, errors, dispatches } = await launch();
 
   await step("未接続ならオンボーディングを表示", async () => {
     await page.goto(`chrome-extension://${id}/manager.html`);
@@ -114,6 +114,68 @@ const step = async (name, fn) => {
     await page.getByPlaceholder(/Title, label/).fill("");
     await page.getByRole("radio", { name: "Closed" }).click();
     await page.getByRole("link", { name: "Dark mode contrast on the settings screen" }).waitFor();
+  });
+
+  await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {
+    await page.getByRole("link", { name: /^Actions/ }).click();
+    await page.getByRole("link", { name: "Deploy", exact: true }).waitFor();
+    assert.equal(await page.locator(".group-row").count(), 3);
+    assert.equal(await page.getByText("Nightly cleanup").count(), 0);
+    await page.getByLabel("Hide disabled").uncheck();
+    await page.getByText("Nightly cleanup").waitFor();
+    await page.getByLabel("Hide disabled").check();
+    await page.screenshot({ path: path.join(OUT, "10-actions.png") });
+  });
+
+  await step("Actions: 手動実行できないワークフローはそう伝える", async () => {
+    await page.getByRole("button", { name: "Run CI" }).click();
+    await page.getByText(/can't be run manually/).waitFor();
+    await page.keyboard.press("Escape");
+    await page.locator("dialog[open]").waitFor({ state: "detached" }).catch(() => {});
+    assert.equal(await page.locator("dialog[open]").count(), 0);
+  });
+
+  await step("Actions: 入力を検証し、確認の画面を経てから実行する", async () => {
+    await page.getByRole("button", { name: "Run Deploy" }).click();
+    const dialog = page.locator("dialog[open]");
+    await dialog.getByLabel(/^environment/).waitFor();
+    // 必須の未入力と数値の誤り
+    await dialog.getByLabel(/^replicas/).fill("two");
+    await dialog.getByRole("button", { name: "Review" }).click();
+    await dialog.getByText("Enter a value.").waitFor();
+    await dialog.getByText("Enter a number.").waitFor();
+    await dialog.getByLabel(/^environment/).selectOption("staging");
+    await dialog.getByLabel(/^level/).selectOption("debug");
+    await dialog.getByLabel(/^dry_run/).uncheck();
+    await dialog.getByLabel(/^replicas/).fill("3");
+    await page.screenshot({ path: path.join(OUT, "11-dispatch-form.png") });
+    await dialog.getByRole("button", { name: "Review" }).click();
+    await dialog.getByRole("heading", { name: "Run this workflow?" }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "12-dispatch-confirm.png") });
+    assert.equal(dispatches.length, 0, "確認の画面に来ただけでは実行しない");
+    // 戻っても入力は残る
+    await dialog.getByRole("button", { name: "Back" }).click();
+    assert.equal(await dialog.getByLabel(/^replicas/).inputValue(), "3");
+    await dialog.getByRole("button", { name: "Review" }).click();
+    await dialog.getByRole("button", { name: "Run workflow" }).click();
+    await dialog.getByText(/The run was requested on master/).waitFor();
+    await page.screenshot({ path: path.join(OUT, "13-dispatch-done.png") });
+    assert.equal(dispatches.length, 1);
+    assert.deepEqual(dispatches[0].body, {
+      ref: "master",
+      inputs: { environment: "staging", level: "debug", dry_run: "false", replicas: "3" },
+    });
+    await dialog.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("Actions: ブランチを変えると、そのブランチの定義を読み直す", async () => {
+    await page.getByRole("button", { name: "Run Release" }).click();
+    const dialog = page.locator("dialog[open]");
+    await dialog.getByText("This workflow has no inputs.").waitFor();
+    await dialog.getByLabel("Branch").selectOption("legacy");
+    await dialog.getByText(/On legacy, this workflow has no workflow_dispatch trigger/).waitFor();
+    await dialog.getByRole("button", { name: "Close" }).click();
+    assert.equal(dispatches.length, 1);
   });
 
   assert.deepEqual(errors, [], "page errors");

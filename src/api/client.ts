@@ -3,6 +3,10 @@
 import {
   decodeArrayOf,
   decodeArtifactPage,
+  decodeBranchNames,
+  decodeEnvironmentNames,
+  decodeWorkflowPage,
+  decodeWorkflowRunPage,
   decodeIssueSearchPage,
   decodeOrganization,
   decodeOwner,
@@ -11,7 +15,17 @@ import {
 } from "./decode";
 import { DecodeError, GitHubApiError } from "./errors";
 import { GitHubHttp, type HttpOptions } from "./http";
-import type { Artifact, Issue, Owner, RepoRef, Repository, TokenInfo, TokenKind } from "./types";
+import type {
+  Artifact,
+  Issue,
+  Owner,
+  RepoRef,
+  Repository,
+  TokenInfo,
+  TokenKind,
+  Workflow,
+  WorkflowRun,
+} from "./types";
 
 const PER_PAGE = 100;
 /** Search API が 1 つの検索で返す件数の上限 */
@@ -103,6 +117,63 @@ export class GitHubClient {
     const url = this.http.url(`${repoPath(artifact.repo)}/actions/artifacts/${artifact.id}/zip`);
     const headers = Object.entries(this.http.headers()).map(([name, value]) => ({ name, value }));
     return { url, headers };
+  }
+
+  async listRepoWorkflows(repo: RepoRef, options: CallOptions = {}): Promise<Workflow[]> {
+    const workflows: Workflow[] = [];
+    const path = `${repoPath(repo)}/actions/workflows`;
+    for await (const page of this.http.paginate(path, { ...options, query: { per_page: PER_PAGE } })) {
+      workflows.push(...decode(() => decodeWorkflowPage(page, repo)));
+    }
+    return workflows;
+  }
+
+  /** リポジトリの新しい順の実行履歴（1 ページ分）。ワークフローごとの最新の実行を知るために使う */
+  async listRecentRuns(repo: RepoRef, options: CallOptions & { perPage?: number } = {}): Promise<WorkflowRun[]> {
+    const { perPage = PER_PAGE, ...rest } = options;
+    const { data } = await this.http.json(`${repoPath(repo)}/actions/runs`, { ...rest, query: { per_page: perPage } });
+    return decode(() => decodeWorkflowRunPage(data, repo));
+  }
+
+  /** ファイルの中身をテキストで取得する（ワークフローの YAML を読むため） */
+  async getFileText(repo: RepoRef, path: string, ref?: string, options: CallOptions = {}): Promise<string> {
+    const encodedPath = path.split("/").map(encodeURIComponent).join("/");
+    const response = await this.http.request(`${repoPath(repo)}/contents/${encodedPath}`, {
+      ...options,
+      accept: "application/vnd.github.raw+json",
+      ...(ref ? { query: { ref } } : {}),
+    });
+    return response.text();
+  }
+
+  async listBranches(repo: RepoRef, options: CallOptions = {}): Promise<string[]> {
+    const names: string[] = [];
+    for await (const page of this.http.paginate(`${repoPath(repo)}/branches`, { ...options, query: { per_page: PER_PAGE } })) {
+      names.push(...decode(() => decodeBranchNames(page)));
+    }
+    return names;
+  }
+
+  async listEnvironments(repo: RepoRef, options: CallOptions = {}): Promise<string[]> {
+    const names: string[] = [];
+    for await (const page of this.http.paginate(`${repoPath(repo)}/environments`, { ...options, query: { per_page: PER_PAGE } })) {
+      names.push(...decode(() => decodeEnvironmentNames(page)));
+    }
+    return names;
+  }
+
+  /** workflow_dispatch でワークフローを実行する。入力値は文字列で送る（GitHub の画面と同じ） */
+  async dispatchWorkflow(
+    workflow: Pick<Workflow, "id" | "repo">,
+    ref: string,
+    inputs: Record<string, string>,
+    options: CallOptions = {},
+  ): Promise<void> {
+    await this.http.request(`${repoPath(workflow.repo)}/actions/workflows/${workflow.id}/dispatches`, {
+      ...options,
+      method: "POST",
+      body: { ref, inputs },
+    });
   }
 
   /** Search API の 1 ページ分 */

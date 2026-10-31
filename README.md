@@ -4,6 +4,7 @@
 
 - 所有者（自分のアカウント・Organization）をチェックで選び、そのリポジトリだけを対象にできます
 - 古い・大きいアーティファクトを絞り込み、まとめて削除またはダウンロードできます（削除は確認つき）
+- ワークフローの一覧と最新の実行を表示し、手動実行（`workflow_dispatch`）できます。入力項目はワークフローの定義に合わせて入力欄・プルダウン・チェックボックスになり、実行の前に必ず確認の画面を挟みます
 - Issue は所有者ごとに検索し、リポジトリ単位でまとめて表示します（現在は表示のみ）
 - 画面は英語と日本語。ブラウザの言語に合わせ、どちらでもなければ英語になります
 
@@ -30,7 +31,9 @@ Chrome ウェブストアには未公開のため、GitHub Actions がビルド�
 | 方式 | 内容 |
 |---|---|
 | GitHub でログイン（OAuth Device Flow） | github.com でコードを入力して承認します。ビルド時に OAuth App の Client ID が必要です |
-| Personal Access Token | Classic（`repo`, `read:org`）または Fine-grained（Actions: Read and write、Issues: Read、Members: Read）。Fine-grained は所有者ごとに 1 つ追加します |
+| Personal Access Token | Classic（`repo`, `read:org`）または Fine-grained（Actions: Read and write、Contents: Read、Issues: Read、Members: Read、Environments: Read）。Fine-grained は所有者ごとに 1 つ追加します |
+
+Fine-grained の Contents: Read はワークフローの定義とブランチを読むため、Environments: Read は `environment` 型の入力を選択肢で出すために使います。Environments を読めない場合は自由入力になります。
 
 トークンは `chrome.storage.local` にだけ保存され、`github.com` と `api.github.com` 以外には送信されません。拡張機能のページには `connect-src https://api.github.com https://github.com` の CSP を設定しています。
 

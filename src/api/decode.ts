@@ -13,6 +13,8 @@ import type {
   RepoRef,
   Repository,
   UserRef,
+  Workflow,
+  WorkflowRun,
   WorkflowRunRef,
 } from "./types";
 
@@ -97,6 +99,7 @@ export function decodeRepository(v: unknown, path = "repo"): Repository {
     archived: bool(o, "archived", path),
     htmlUrl: str(o, "html_url", path),
     pushedAt: optStr(o, "pushed_at", path),
+    defaultBranch: optStr(o, "default_branch", path),
   };
 }
 
@@ -225,4 +228,55 @@ export function splitScopes(s: string): string[] {
     .split(",")
     .map((x) => x.trim())
     .filter((x) => x.length > 0);
+}
+
+export function decodeWorkflow(v: unknown, repo: RepoRef, path = "workflow"): Workflow {
+  const o = obj(v, path);
+  return {
+    id: num(o, "id", path),
+    repo,
+    name: str(o, "name", path),
+    path: str(o, "path", path),
+    state: str(o, "state", path),
+    htmlUrl: str(o, "html_url", path),
+  };
+}
+
+export function decodeWorkflowPage(v: unknown, repo: RepoRef): Workflow[] {
+  const o = obj(v, "workflows");
+  return decodeArrayOf(o["workflows"], "workflows.workflows", (x, p) => decodeWorkflow(x, repo, p));
+}
+
+export function decodeRun(v: unknown, repo: RepoRef, path = "run"): WorkflowRun {
+  const o = obj(v, path);
+  const actor = o["actor"];
+  return {
+    id: num(o, "id", path),
+    workflowId: num(o, "workflow_id", path),
+    repo,
+    runNumber: num(o, "run_number", path),
+    status: optStr(o, "status", path),
+    conclusion: optStr(o, "conclusion", path),
+    event: str(o, "event", path),
+    headBranch: optStr(o, "head_branch", path),
+    actor: actor === null || actor === undefined ? null : decodeUserRef(actor, `${path}.actor`),
+    createdAt: str(o, "created_at", path),
+    updatedAt: str(o, "updated_at", path),
+    htmlUrl: str(o, "html_url", path),
+  };
+}
+
+export function decodeWorkflowRunPage(v: unknown, repo: RepoRef): WorkflowRun[] {
+  const o = obj(v, "runs");
+  return decodeArrayOf(o["workflow_runs"], "runs.workflow_runs", (x, p) => decodeRun(x, repo, p));
+}
+
+/** ブランチ一覧の要素から名前だけを取り出す */
+export function decodeBranchNames(v: unknown): string[] {
+  return decodeArrayOf(v, "branches", (x, p) => str(obj(x, p), "name", p));
+}
+
+export function decodeEnvironmentNames(v: unknown): string[] {
+  const o = obj(v, "environments");
+  return decodeArrayOf(o["environments"], "environments.environments", (x, p) => str(obj(x, p), "name", p));
 }
