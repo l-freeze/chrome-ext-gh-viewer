@@ -73,8 +73,9 @@ describe("GitHubClient", () => {
     });
   });
 
-  it("inspectToken は Fine-grained PAT ならスコープを null にする", async () => {
-    const { client } = testClient(() => json(rawUser("me")));
+  it("inspectToken は Fine-grained PAT ならスコープを null にする（空の X-OAuth-Scopes が付いていても）", async () => {
+    // GitHub App のユーザートークンでは空の X-OAuth-Scopes が返ることを確認済み。Fine-grained PAT も同様でも誤判定しないこと
+    const { client } = testClient(() => json(rawUser("me"), { headers: { "x-oauth-scopes": "" } }));
     const info = await client.inspectToken("github_pat_abc");
     expect(info.kind).toBe("fine-grained-pat");
     expect(info.scopes).toBeNull();
