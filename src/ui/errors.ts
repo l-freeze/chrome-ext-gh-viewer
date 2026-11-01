@@ -1,9 +1,19 @@
-import { DeviceFlowError } from "../api/deviceFlow";
-import { GitHubApiError } from "../api/errors";
-import type { Translate } from "../i18n";
+// エラーを利用者向けの文にする。
+// GitHub のエラーの分類を読むため、表示に限って integrations/github のエラー型に依存する。
 
-/** エラーを利用者向けの文に変える */
-export function errorText(t: Translate, error: GitHubApiError | DeviceFlowError, nowMs = Date.now()): string {
+import { DuplicateTokenError } from "../features/settings/credential";
+import { DeviceFlowError } from "../integrations/github/device-flow";
+import { GitHubApiError } from "../integrations/github/errors";
+import { isAbort } from "../lib/concurrency";
+import { ValidationError } from "../lib/validation";
+import type { Translate } from "./i18n";
+
+/** 中断による失敗か（利用者に知らせる必要はない） */
+export function isAborted(e: unknown): boolean {
+  return isAbort(e) || (e instanceof GitHubApiError && e.kind === "aborted") || (e instanceof DeviceFlowError && e.kind === "aborted");
+}
+
+export function errorText(t: Translate, error: unknown, nowMs = Date.now()): string {
   if (error instanceof DeviceFlowError) {
     switch (error.kind) {
       case "expired":
@@ -20,14 +30,30 @@ export function errorText(t: Translate, error: GitHubApiError | DeviceFlowError,
         return t("settings.oauth.failed", { message: error.message });
     }
   }
-  switch (error.kind) {
-    case "rate_limited": {
-      const sec = error.retryAfterSec ?? (error.rateLimit ? error.rateLimit.reset - nowMs / 1000 : 60);
-      return t("error.rate_limited", { minutes: Math.max(1, Math.ceil(sec / 60)) });
+  if (error instanceof GitHubApiError) {
+    switch (error.kind) {
+      case "rate_limited": {
+        const sec = error.retryAfterSec ?? (error.rateLimit ? error.rateLimit.reset - nowMs / 1000 : 60);
+        return t("error.rate_limited", { minutes: Math.max(1, Math.ceil(sec / 60)) });
+      }
+      case "unexpected":
+        return t("error.unexpected", { message: error.message });
+      default:
+        return t(`error.${error.kind}`);
     }
-    case "unexpected":
-      return t("error.unexpected", { message: error.message });
-    default:
-      return t(`error.${error.kind}`);
   }
+  if (error instanceof DuplicateTokenError) return t("settings.pat.duplicate");
+  if (error instanceof ValidationError) return error.message;
+  if (isAbort(error)) return t("error.aborted");
+  return t("error.unexpected", { message: String(error) });
+}
+
+/** トークンが無効・失効しているという失敗か */
+export function isUnauthorized(e: unknown): boolean {
+  return e instanceof GitHubApiError && e.kind === "unauthorized";
+}
+
+/** SSO の承認ページがあれば返す */
+export function ssoUrlOf(error: unknown): string | null {
+  return error instanceof GitHubApiError ? (error.ssoUrl ?? null) : null;
 }

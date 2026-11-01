@@ -1,0 +1,95 @@
+/* ---- 設定・オンボーディング ---------------------------------------------- */
+
+.settings {
+  max-width: 760px;
+}
+.methods {
+  margin: 0 0 12px;
+  padding: 0;
+  border: 0;
+}
+.methods legend {
+  margin-bottom: 8px;
+  font-weight: 600;
+}
+.method {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 8px;
+  padding: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  cursor: pointer;
+}
+.method span {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.method--disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+.panel {
+  padding: 16px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.device {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 8px;
+}
+.device p {
+  margin: 0;
+}
+.device__code {
+  font-size: 28px;
+  font-weight: 600;
+  letter-spacing: 0.12em;
+}
+.device__actions {
+  display: flex;
+  gap: 8px;
+}
+.patform {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.patform .error {
+  flex-basis: 100%;
+}
+.links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 16px;
+  margin: 10px 0;
+}
+.credentials {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.credential {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 0;
+  border-top: 1px solid var(--border);
+}
+.panel > .credential {
+  border-top: 0;
+  padding: 0;
+}
+.credential__body {
+  flex: 1;
+  min-width: 0;
+}
+.credential__actions {
+  display: flex;
+  gap: 6px;
+}

@@ -1,20 +1,19 @@
 import { For, Show } from "solid-js";
-import type { GitHubApiError } from "../../api/errors";
-import type { Operation } from "../../domain/permissions";
-import { errorText } from "../errors";
-import { useDeps } from "../state/context";
+import type { GitHubOperation } from "../../integrations/github/permissions";
+import { useUi } from "../app/context";
+import { errorText, ssoUrlOf } from "../errors";
 import { Icon } from "./Icon";
 import { PermissionHint } from "./PermissionHint";
 
 export interface FailureItem {
   key: string;
   label: string;
-  error: GitHubApiError;
+  error: unknown;
 }
 
 /** 読み込めなかったリポジトリ・所有者の一覧。理由ごとの対処も示す */
-export function Failures(props: { title: string; items: FailureItem[]; operation?: Operation }) {
-  const { i18n } = useDeps();
+export function Failures(props: { title: string; items: FailureItem[]; operation?: GitHubOperation }) {
+  const { i18n } = useUi();
   return (
     <Show when={props.items.length > 0}>
       <details class="failures">
@@ -28,16 +27,14 @@ export function Failures(props: { title: string; items: FailureItem[]; operation
               <li>
                 <span class="mono">{item.label}</span>
                 <span class="failures__reason">{errorText(i18n.t, item.error)}</span>
-                <Show when={item.error.ssoUrl}>
+                <Show when={ssoUrlOf(item.error)}>
                   {(url) => (
                     <a href={url()} target="_blank" rel="noreferrer">
                       {i18n.t("error.sso_link")}
                     </a>
                   )}
                 </Show>
-                <Show when={props.operation}>
-                  {(op) => <PermissionHint error={item.error} operation={op()} />}
-                </Show>
+                <Show when={props.operation}>{(op) => <PermissionHint error={item.error} operation={op()} />}</Show>
               </li>
             )}
           </For>

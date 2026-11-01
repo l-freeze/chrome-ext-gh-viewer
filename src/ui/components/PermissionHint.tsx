@@ -1,16 +1,17 @@
 import { For, Show } from "solid-js";
-import type { GitHubApiError } from "../../api/errors";
-import { describePermission, permissionHint, type Operation } from "../../domain/permissions";
-import { useDeps } from "../state/context";
+import { GitHubApiError } from "../../integrations/github/errors";
+import { describePermission, permissionHint, type GitHubOperation } from "../../integrations/github/permissions";
+import { useUi } from "../app/context";
 import { Icon } from "./Icon";
+import "./components.css";
 
 const FINE_GRAINED_SETTINGS_URL = "https://github.com/settings/personal-access-tokens";
 const CLASSIC_SETTINGS_URL = "https://github.com/settings/tokens";
 
 /** 権限不足が原因でありうるエラーのとき、必要な権限を箇条書きで示す */
-export function PermissionHint(props: { error: GitHubApiError; operation: Operation }) {
-  const { t } = useDeps().i18n;
-  const hint = () => permissionHint(props.error, props.operation);
+export function PermissionHint(props: { error: unknown; operation: GitHubOperation }) {
+  const { t } = useUi().i18n;
+  const hint = () => (props.error instanceof GitHubApiError ? permissionHint(props.error, props.operation) : null);
 
   return (
     <Show when={hint()}>

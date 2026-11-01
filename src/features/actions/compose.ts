@@ -1,4 +1,4 @@
-import { createDispatchController } from "./controllers/dispatch";
+import { createDispatchController, reviewDispatch } from "./controllers/dispatch";
 import type { ActionsOperations, ActionsSource } from "./ports";
 import { createDispatchWorkflow } from "./use-cases/dispatch";
 import { createLatestRuns, createListWorkflows } from "./use-cases/list";
@@ -12,6 +12,7 @@ export function createActionsFeature(dependencies: { source: ActionsSource; now:
     latestRuns: createLatestRuns(source),
     prepareDispatch: createPrepareDispatch(source),
     readDispatchSpec: createReadDispatchSpec(source),
+    reviewDispatch,
     dispatch: createDispatchController(createDispatchWorkflow(source)),
     searchRuns: createSearchRuns(source, now),
     removeRuns: createRemoveRuns(source),

@@ -3,9 +3,10 @@
 import { ValidationError, type Validator } from "../../../lib/validation";
 import type { DispatchInput } from "../dispatch";
 import type { DispatchWorkflow, DispatchWorkflowInput } from "../use-cases/dispatch";
-import type { DispatchRequest } from "../ports";
+import type { DispatchRequest, DispatchReview } from "../ports";
 
-export type InputError = "required" | "number" | "choice";
+export type { DispatchInputError as InputError } from "../ports";
+import type { DispatchInputError as InputError } from "../ports";
 
 /** 入力値の誤りを入力名ごとに返す。誤りがなければ空のオブジェクト */
 export function validateInputs(
@@ -63,6 +64,14 @@ const input: Validator<DispatchWorkflowInput> = {
     return { target: r.target, ref: r.ref, inputs: toDispatchInputs(r.inputs, r.values) };
   },
 };
+
+/** 実行の前の確認。誤りがあれば入力名ごとに返し、なければ送る値を返す */
+export function reviewDispatch(r: DispatchRequest): DispatchReview {
+  const errors = validateInputs(r.inputs, r.values, r.environments);
+  const refMissing = r.ref === "";
+  if (refMissing || Object.keys(errors).length > 0) return { ok: false, errors, refMissing };
+  return { ok: true, inputs: toDispatchInputs(r.inputs, r.values) };
+}
 
 export function createDispatchController(execute: DispatchWorkflow) {
   return async (raw: unknown) => execute(input.parse(raw));

@@ -27,6 +27,12 @@ export interface DispatchRequest {
   environments: readonly string[] | null;
 }
 
+export type DispatchInputError = "required" | "number" | "choice";
+
+export type DispatchReview =
+  | { ok: true; inputs: Record<string, string> }
+  | { ok: false; errors: Record<string, DispatchInputError>; refMissing: boolean };
+
 export interface RunSearchResult {
   runs: WorkflowRun[];
   /** 1,000 件を超えていて、残りは返っていない */
@@ -43,6 +49,8 @@ export interface ActionsOperations {
   prepareDispatch(target: DispatchTarget): Promise<DispatchPreparation>;
   /** 指定したブランチの定義を読む（入力の定義はブランチごとに違いうる） */
   readDispatchSpec(target: DispatchTarget, ref: string): Promise<DispatchSpec>;
+  /** 実行の前の確認用。入力を検証し、誤りか、送る値を返す（実行はしない） */
+  reviewDispatch(request: DispatchRequest): DispatchReview;
   /** 入力を検証してから実行を依頼する（入力は DispatchRequest の形） */
   dispatch(request: unknown): Promise<void>;
   searchRuns(
