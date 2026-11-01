@@ -4,7 +4,9 @@ import { createActionsFeature } from "../../src/features/actions/compose";
 import { DispatchInputError, toDispatchInputs, validateInputs } from "../../src/features/actions/controllers/dispatch";
 import { defaultValues, parseDispatchSpec, WorkflowParseError } from "../../src/features/actions/dispatch";
 import type { ActionsSource, DispatchTarget } from "../../src/features/actions/ports";
-import { canTryDispatch, latestRunByWorkflow, runBadge, type Workflow, type WorkflowRun } from "../../src/features/actions/workflow";
+import { canTryDispatch, isFinished, latestRunByWorkflow, runBadge, withLatestRun, type Workflow, type WorkflowRun } from "../../src/features/actions/workflow";
+import { createGitHubActionsSource } from "../../src/features/actions/gateways/github";
+import { json, testHttp } from "../helpers";
 import type { Repository } from "../../src/features/workspace/repository";
 import { ValidationError } from "../../src/lib/validation";
 
@@ -104,7 +106,8 @@ function fakeSource(o: Partial<ActionsSource> = {}) {
     readWorkflowFile: async (_r, _p, ref) => (ref === "legacy" ? "on: push\njobs: {}" : WORKFLOW_WITH_INPUTS),
     listBranches: async () => ["dev", "master"],
     listEnvironments: async () => ["prod"],
-    dispatch: async (r, id, ref, inputs) => void dispatched.push({ repo: r, id, ref, inputs }),
+    dispatch: async (r, id, ref, inputs) => (dispatched.push({ repo: r, id, ref, inputs }), { id: 500, htmlUrl: "https://github.com/acme/web/actions/runs/500" }),
+    readRun: async () => null,
     searchRuns: async () => ({ runs: [], truncated: false }),
     removeRun: async () => undefined,
     ...o,
@@ -144,7 +147,7 @@ describe("Actions の操作", () => {
     expect((err as DispatchInputError).errors).toEqual({ environment: "required" });
     await expect(f.dispatch({ ...request, ref: "" })).rejects.toBeInstanceOf(ValidationError);
     expect(dispatched).toEqual([]);
-    await f.dispatch({ ...request, values: { ...request.values, environment: "prod" } });
+    expect(await f.dispatch({ ...request, values: { ...request.values, environment: "prod" } })).toEqual({ id: 500, htmlUrl: "https://github.com/acme/web/actions/runs/500" });
     expect(dispatched).toEqual([
       { repo: { owner: "acme", name: "web" }, id: 20, ref: "master", inputs: { environment: "prod", level: "info", dry_run: "true", replicas: "2" } },
     ]);
@@ -180,6 +183,26 @@ describe("ワークフローと実行の判定", () => {
   it("ワークフローごとに作成日時の最も新しい実行を選ぶ", () => {
     const latest = latestRunByWorkflow([run(1, 10, "2026-01-02"), run(2, 10, "2026-01-03"), run(3, 20, "2026-01-01")]);
     expect([...latest.entries()].map(([wf, r]) => [wf, r.id])).toEqual([[10, 2], [20, 3]]);
+  });
+
+  it("追っている実行は、そのワークフローの最新の実行と同じか新しいときだけ差し替える", () => {
+    const list = [
+      { workflow: workflow(10, "CI"), lastRun: run(5, 10, "2026-01-05T00:00:00Z") },
+      { workflow: workflow(20, "Deploy"), lastRun: null },
+    ];
+    const queued = run(6, 10, "2026-01-06T00:00:00Z", { status: "queued", conclusion: null });
+    expect(withLatestRun(list, queued).map((w) => w.lastRun?.id ?? null)).toEqual([6, null]);
+    // 古い実行では上書きしない
+    expect(withLatestRun(list, run(4, 10, "2026-01-04T00:00:00Z"))[0]!.lastRun?.id).toBe(5);
+    expect(withLatestRun(list, run(7, 20, "2026-01-01T00:00:00Z"))[1]!.lastRun?.id).toBe(7);
+    expect(isFinished(queued)).toBe(false);
+    expect(isFinished(run(5, 10, "2026-01-05"))).toBe(true);
+  });
+
+  it("作られた直後でまだ見えない実行（404）は null として返す", async () => {
+    const { http } = testHttp(() => json({ message: "Not Found" }, { status: 404 }));
+    const source = createGitHubActionsSource(() => http);
+    expect(await source.readRun({ owner: "acme", name: "web" }, 321)).toBeNull();
   });
 
   it("整理の条件・ワークフロー名・まとめ", () => {

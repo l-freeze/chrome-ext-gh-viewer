@@ -1,6 +1,6 @@
 // アーティファクト・キャッシュ・Actions・リポジトリの中身の API 呼び出しと応答の読み取り。
 import { describe, expect, it } from "vitest";
-import { dispatchWorkflow, deleteRun, listRecentRuns, listWorkflows, readRun, searchRuns } from "../../../src/integrations/github/actions";
+import { dispatchWorkflow, deleteRun, getRun, listRecentRuns, listWorkflows, readRun, searchRuns } from "../../../src/integrations/github/actions";
 import { artifactZipRequest, deleteArtifact, listArtifacts, readArtifact } from "../../../src/integrations/github/artifacts";
 import { deleteCache, listCaches } from "../../../src/integrations/github/caches";
 import { getFileText, listBranches, listEnvironments } from "../../../src/integrations/github/contents";
@@ -107,15 +107,27 @@ describe("Actions", () => {
     expect(calls[0]!.url.searchParams.get("status")).toBe("completed");
   });
 
-  it("実行の削除と、手動実行（ref と inputs を POST）", async () => {
+  it("実行の削除と、手動実行（ref と inputs を POST し、作られた実行の ID を求める）", async () => {
     const { http, calls } = testHttp(() => new Response(null, { status: 204 }));
     await deleteRun(http, repo, 9);
-    await dispatchWorkflow(http, repo, 7, "master", { level: "debug" });
+    // 実行の ID が返らない応答（204）では null
+    expect(await dispatchWorkflow(http, repo, 7, "master", { level: "debug" })).toBeNull();
     expect(calls.map((c) => `${c.method} ${c.url.pathname}`)).toEqual([
       "DELETE /repos/acme/web/actions/runs/9",
       "POST /repos/acme/web/actions/workflows/7/dispatches",
     ]);
-    expect(JSON.parse(calls[1]!.body!)).toEqual({ ref: "master", inputs: { level: "debug" } });
+    expect(JSON.parse(calls[1]!.body!)).toEqual({ ref: "master", inputs: { level: "debug" }, return_run_details: true });
+  });
+
+  it("手動実行で作られた実行の ID を受け取り、その実行を 1 件取得できる", async () => {
+    const { http, calls } = testHttp((c) =>
+      c.method === "POST"
+        ? json({ workflow_run_id: 321, run_url: "https://api.github.com/repos/acme/web/actions/runs/321", html_url: "https://github.com/acme/web/actions/runs/321" })
+        : json({ id: 321, workflow_id: 7, name: "Deploy", display_title: null, run_number: 5, status: "queued", conclusion: null, event: "workflow_dispatch", head_branch: "master", actor: null, created_at: "2026-11-01T00:00:00Z", updated_at: "2026-11-01T00:00:00Z", html_url: "https://github.com/acme/web/actions/runs/321" }),
+    );
+    expect(await dispatchWorkflow(http, repo, 7, "master", {})).toEqual({ workflow_run_id: 321, html_url: "https://github.com/acme/web/actions/runs/321" });
+    expect((await getRun(http, repo, 321)).status).toBe("queued");
+    expect(calls[1]!.url.pathname).toBe("/repos/acme/web/actions/runs/321");
   });
 });
 

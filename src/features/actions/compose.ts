@@ -14,6 +14,7 @@ export function createActionsFeature(dependencies: { source: ActionsSource; now:
     readDispatchSpec: createReadDispatchSpec(source),
     reviewDispatch,
     dispatch: createDispatchController(createDispatchWorkflow(source)),
+    readRun: (repo, runId) => source.readRun(repo, runId),
     searchRuns: createSearchRuns(source, now),
     removeRuns: createRemoveRuns(source),
   };

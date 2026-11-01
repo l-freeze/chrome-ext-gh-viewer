@@ -1,5 +1,5 @@
 import { toRepoRef } from "../../workspace/repository";
-import type { ActionsSource, DispatchTarget } from "../ports";
+import type { ActionsSource, DispatchedRun, DispatchTarget } from "../ports";
 
 export interface DispatchWorkflowInput {
   target: DispatchTarget;
@@ -8,7 +8,7 @@ export interface DispatchWorkflowInput {
   inputs: Record<string, string>;
 }
 
-export type DispatchWorkflow = (input: DispatchWorkflowInput) => Promise<void>;
+export type DispatchWorkflow = (input: DispatchWorkflowInput) => Promise<DispatchedRun | null>;
 
 export function createDispatchWorkflow(source: ActionsSource): DispatchWorkflow {
   return ({ target, ref, inputs }) => source.dispatch(toRepoRef(target.repo), target.workflow.id, ref, inputs);

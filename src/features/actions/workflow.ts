@@ -40,6 +40,23 @@ export interface WorkflowWithRun {
   lastRun: WorkflowRun | null;
 }
 
+export function isFinished(run: Pick<WorkflowRun, "status">): boolean {
+  return run.status === "completed";
+}
+
+/**
+ * 1 つの実行の最新の状態を一覧に当てる。そのワークフローの最新の実行と同じか、それより新しいときだけ差し替える
+ * （古い実行で新しい実行を上書きしない）
+ */
+export function withLatestRun(list: readonly WorkflowWithRun[], run: WorkflowRun): WorkflowWithRun[] {
+  return list.map((w) => {
+    if (w.workflow.id !== run.workflowId) return w;
+    const cur = w.lastRun;
+    const newer = cur === null || cur.id === run.id || Date.parse(run.createdAt) >= Date.parse(cur.createdAt);
+    return newer ? { ...w, lastRun: run } : w;
+  });
+}
+
 /** 新しい順に並んだ実行履歴から、ワークフローごとの最新の実行を取り出す */
 export function latestRunByWorkflow(runs: readonly WorkflowRun[]): Map<number, WorkflowRun> {
   const latest = new Map<number, WorkflowRun>();

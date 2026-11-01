@@ -183,6 +183,8 @@ export const en = {
   "dispatch.run": "Run workflow",
   "dispatch.running": "Starting the run…",
   "dispatch.done": "The run was requested on {ref}. It can take a few seconds to appear in the list.",
+  "dispatch.doneTracked": "The run was started on {ref}. The list follows its status until it finishes.",
+  "dispatch.openRun": "Open the run on GitHub",
   "dispatch.openOnGitHub": "Open on GitHub",
   "dispatch.failed": "Could not start the run.",
 

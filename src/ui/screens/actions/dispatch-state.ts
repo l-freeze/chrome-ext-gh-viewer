@@ -3,7 +3,7 @@
 
 import { createSignal } from "solid-js";
 import { defaultValues, WorkflowParseError, type DispatchInput } from "../../../features/actions/dispatch";
-import type { DispatchInputError, DispatchTarget } from "../../../features/actions/ports";
+import type { DispatchedRun, DispatchInputError, DispatchTarget } from "../../../features/actions/ports";
 import type { Repository } from "../../../features/workspace/repository";
 import type { UiDeps } from "../../app/context";
 
@@ -27,13 +27,11 @@ export type DispatchPhase =
   | ({ phase: "form"; errors: Record<string, DispatchInputError>; reloading: boolean } & FormData)
   | ({ phase: "confirm"; payload: Record<string, string> } & FormData)
   | ({ phase: "running"; payload: Record<string, string> } & FormData)
-  | { phase: "done"; target: DispatchTarget; ref: string }
+  | { phase: "done"; target: DispatchTarget; ref: string; runUrl: string | null }
   | ({ phase: "failed"; payload: Record<string, string>; error: unknown } & FormData);
 
-/** 実行の依頼から一覧に新しい実行が現れるまでの目安 */
-const REFRESH_DELAY_MS = 4000;
-
-export function createDispatchState(deps: UiDeps, onDispatched: (repo: Repository) => void) {
+/** onDispatched: 実行を依頼できたとき。GitHub が作られた実行を返さなかったときは run が null */
+export function createDispatchState(deps: UiDeps, onDispatched: (repo: Repository, run: DispatchedRun | null) => void) {
   const ops = deps.manager.actions;
   const [state, setState] = createSignal<DispatchPhase>({ phase: "closed" });
   // 閉じたあとに古い読み込みが結果を書き戻さないよう、開くたびに番号を変える
@@ -130,10 +128,10 @@ export function createDispatchState(deps: UiDeps, onDispatched: (repo: Repositor
     const id = session;
     setState({ ...s, phase: "running" });
     try {
-      await ops.dispatch(request(s));
+      const run = await ops.dispatch(request(s));
+      onDispatched(s.target.repo, run);
       if (id !== session) return;
-      setState({ phase: "done", target: s.target, ref: s.ref });
-      setTimeout(() => onDispatched(s.target.repo), REFRESH_DELAY_MS);
+      setState({ phase: "done", target: s.target, ref: s.ref, runUrl: run?.htmlUrl ?? null });
     } catch (error) {
       if (id !== session) return;
       setState({ ...s, phase: "failed", error });
