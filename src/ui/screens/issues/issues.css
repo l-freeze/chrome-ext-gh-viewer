@@ -49,16 +49,6 @@
   white-space: normal !important;
   max-width: 280px;
 }
-.label {
-  display: inline-block;
-  margin: 2px 4px 2px 0;
-  padding: 0 7px;
-  border-radius: 10px;
-  background: var(--surface-2);
-  font-size: 12px;
-  font-weight: 500;
-  line-height: 20px;
-}
 .cell-assignees span + span {
   margin-left: -4px;
 }

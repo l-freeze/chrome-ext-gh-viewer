@@ -12,6 +12,7 @@ const paths = {
   comment: "M4 5h16v11H9l-5 4V5Z",
   x: "M6 6l12 12M18 6 6 18",
   play: "M8 5.5v13l10.5-6.5L8 5.5Z",
+  chevron: "M9 6l6 6-6 6",
 } as const;
 
 export type IconName = keyof typeof paths;

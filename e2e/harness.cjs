@@ -30,7 +30,7 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
         return json(route, fx.viewer, 200, { "github-authentication-token-expiration": "2026-12-15 00:00:00 UTC" });
       if (token.includes("narrow")) return json(route, fx.viewer, 200, { "x-oauth-scopes": "public_repo" });
       return json(route, fx.viewer, 200, {
-        "x-oauth-scopes": "repo, read:org",
+        "x-oauth-scopes": "repo, read:org, project",
         ...(token.startsWith("ghp_") ? { "github-authentication-token-expiration": "2027-01-31 00:00:00 UTC" } : {}),
       });
     }
@@ -120,6 +120,35 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       dispatches.push({ repo: `${m[1]}/${m[2]}`, workflowId: Number(m[3]), body: JSON.parse(req.postData() ?? "{}") });
       return route.fulfill({ status: 204 });
     }
+    m = /^\/(orgs|users)\/([^/]+)\/projectsV2(?:\/(\d+)(?:\/(fields|items)(?:\/(\d+))?)?)?$/.exec(p);
+    if (m) {
+      const [, , owner, number, part, itemIdText] = m;
+      if (owner === "locked-corp")
+        return json(route, { message: "Your token has not been granted the required scopes to execute this query." }, 403, { "x-accepted-oauth-scopes": "read:project" });
+      if (!number) return json(route, fx.projectsByOwner[owner] ?? []);
+      const key = `${owner}/${number}`;
+      const field = fx.statusFieldByProject[key];
+      if (part === "fields") return json(route, [{ id: 300, name: "Title", data_type: "title" }, ...(field ? [field] : [])]);
+      const items = control.projectItems[key] ?? [];
+      if (part === "items" && !itemIdText) {
+        const fields = (url.searchParams.get("fields") ?? "").split(",").filter(Boolean).map(Number);
+        return json(route, items.map(({ status, ...i }) => ({
+          ...i,
+          fields: field && fields.includes(field.id)
+            ? [{ id: field.id, name: field.name, data_type: "single_select", value: field.options.find((o) => o.id === status) ?? null }]
+            : [],
+        })));
+      }
+      if (part === "items" && req.method() === "PATCH") {
+        const body = JSON.parse(req.postData() ?? "{}");
+        control.patches.push({ project: key, item: Number(itemIdText), body });
+        if (control.failMoves)
+          return json(route, { message: "Resource not accessible by personal access token" }, 403, { "x-accepted-github-permissions": "organization_projects=write" });
+        const target = items.find((i) => i.id === Number(itemIdText));
+        if (target) target.status = body.fields[0].value;
+        return json(route, target ?? {});
+      }
+    }
     if (p === "/search/issues") {
       const q = url.searchParams.get("q");
       const owner = /(?:org|user):(\S+)/.exec(q)[1];
@@ -147,7 +176,7 @@ function oauth(log) {
         interval: 1,
       });
     if (url.pathname === "/login/oauth/access_token")
-      return json(route, polls++ === 0 ? { error: "authorization_pending" } : { access_token: "gho_e2e_fake", token_type: "bearer", scope: "repo,read:org" });
+      return json(route, polls++ === 0 ? { error: "authorization_pending" } : { access_token: "gho_e2e_fake", token_type: "bearer", scope: "repo,read:org,project" });
     return route.fulfill({ status: 404 });
   };
 }
@@ -170,6 +199,9 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     runs: structuredClone(fx.runsByRepo),
     oldRuns: structuredClone(fx.oldRunsByRepo),
     caches: structuredClone(fx.cachesByRepo),
+    projectItems: structuredClone(fx.projectItems),
+    patches: [],
+    failMoves: false,
     completeAllRuns() {
       for (const list of Object.values(this.runs))
         for (const run of list) if (run.status !== "completed") Object.assign(run, { status: "completed", conclusion: "success" });

@@ -7,7 +7,7 @@ import { num, obj, optNum, optStr, str, ValidationError } from "../../lib/valida
 import { splitScopes } from "./user";
 
 export const DEFAULT_OAUTH_BASE_URL = "https://github.com";
-export const DEFAULT_SCOPES = ["repo", "read:org"];
+export const DEFAULT_SCOPES = ["repo", "read:org", "project"];
 
 export interface DeviceCode {
   deviceCode: string;

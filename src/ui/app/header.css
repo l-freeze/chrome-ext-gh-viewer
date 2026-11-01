@@ -178,6 +178,44 @@
   height: 100%;
 }
 
+/* Issue タブの下に出す「一覧」「カンバン」。マウスを合わせたときとキーボードで選んだときに出す */
+.tab-menu {
+  display: flex;
+}
+.tab-menu__list {
+  display: none;
+  position: fixed;
+  z-index: 20;
+  min-width: 160px;
+  margin: 0;
+  padding: 4px;
+  list-style: none;
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  box-shadow: 0 8px 24px rgb(0 0 0 / 0.18);
+}
+.tab-menu:hover .tab-menu__list,
+.tab-menu:has(:focus-visible) .tab-menu__list {
+  display: block;
+}
+.tab-menu__list a {
+  display: block;
+  padding: 6px 10px;
+  border-radius: 4px;
+  color: var(--text);
+  font-size: 13px;
+}
+.tab-menu__list a:hover {
+  background: var(--surface-2);
+  text-decoration: none;
+}
+.tab-menu__list a[aria-current="page"] {
+  background: var(--accent-soft);
+  color: var(--accent);
+  font-weight: 600;
+}
+
 /* 狭い画面ではタブを 1 行に分け、収まらなければその行だけを横にスクロールさせる。
    タイトルの文字と容量のメーターは隠す */
 @media (max-width: 640px) {

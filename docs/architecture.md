@@ -13,7 +13,8 @@ src/
 │   ├── artifacts/            アーティファクト
 │   ├── caches/               Actions のキャッシュ
 │   ├── actions/              ワークフロー一覧・手動実行・実行履歴の整理
-│   └── issues/               Issue の横断検索
+│   ├── issues/               Issue の横断検索（Issue タブの List）
+│   └── projects/             Projects のカンバンと、項目の Status の変更（Issue タブの Kanban）
 ├── integrations/github/      GitHub という外部サービスの約束ごと
 ├── infrastructure/           汎用の技術基盤（HTTP 送信、保存先、ダウンロード）
 ├── lib/                      仕組みだけの道具（検証、同時実行、並べ替え、時間）
@@ -94,6 +95,15 @@ ui/
 
 - 新しいモデルや GitHub API の新しい分野を扱う → `features/` に機能を足し、`screens/` に画面を足す
 - 既存の機能を組み合わせて見せるだけ → `screens/` に画面だけを足す
+
+例: Issue タブの Kanban は、Projects という新しい API の分野とモデル（プロジェクト・列・項目）を扱うため、`features/projects` と `screens/kanban` を足しています。List（`features/issues` と `screens/issues`）とは独立しています。
+
+### ドラッグ＆ドロップ
+
+- カードを掴む・運ぶ・落とす位置の判定と、キーボードでの移動は、画面だけの処理として `screens/kanban/KanbanScreen.tsx` に置く
+- 落とした先の列（選択肢）を使って Status を変えるのは `features/projects` の `moveItem`
+- 先に画面で動かし、失敗したら元の列へ戻す処理は `screens/kanban/state.ts` に置く
+- 人が文字を入力する操作ではないので controller は置かない。移動先が選択肢にあるかは use-case で確かめる
 - 画面を持たない機能（バックグラウンドの通知など） → `features/` だけを足す
 
 ## テスト
