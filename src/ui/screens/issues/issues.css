@@ -1,0 +1,64 @@
+/* ---- Issue -------------------------------------------------------------- */
+
+.issues__count {
+  margin: 0 0 0 auto;
+}
+.group-row th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.group-row a {
+  color: var(--text);
+}
+.group-row__count {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--text-3);
+}
+.table--issues td {
+  height: 40px;
+}
+.cell-title {
+  white-space: normal !important;
+  min-width: 320px;
+  padding-top: 6px !important;
+  padding-bottom: 6px !important;
+}
+.cell-title a {
+  color: var(--text);
+  font-weight: 500;
+}
+.row--closed .cell-title a {
+  color: var(--text-2);
+}
+.state-dot {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  margin-right: 8px;
+  border-radius: 50%;
+  vertical-align: 1px;
+}
+.state-dot--open {
+  background: #1f883d;
+}
+.state-dot--closed {
+  background: #8250df;
+}
+.cell-labels {
+  white-space: normal !important;
+  max-width: 280px;
+}
+.label {
+  display: inline-block;
+  margin: 2px 4px 2px 0;
+  padding: 0 7px;
+  border-radius: 10px;
+  background: var(--surface-2);
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+}
+.cell-assignees span + span {
+  margin-left: -4px;
+}

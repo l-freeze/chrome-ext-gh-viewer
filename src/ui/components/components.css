@@ -1,0 +1,28 @@
+/* ---- 必要な権限の案内 ------------------------------------------------------ */
+
+.permission-hint {
+  margin-top: 8px;
+  padding: 10px 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  color: var(--text);
+  font-size: 13px;
+}
+.permission-hint p {
+  margin: 0;
+}
+.permission-hint__title {
+  font-weight: 600;
+}
+.permission-hint__group {
+  margin-top: 8px;
+}
+.permission-hint ul,
+.permission-hint ol {
+  margin: 4px 0 0;
+  padding-left: 20px;
+}
+.permission-hint > .muted {
+  margin-top: 8px;
+}
