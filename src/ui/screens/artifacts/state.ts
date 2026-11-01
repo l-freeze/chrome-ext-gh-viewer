@@ -16,6 +16,7 @@ import {
   type ArtifactSortKey,
 } from "../../../features/artifacts/listing";
 import { repoKey } from "../../../features/workspace/repository";
+import { mergeList } from "../../../lib/reuse";
 import { toggleSort } from "../../../lib/sort";
 import type { UiDeps } from "../../app/context";
 import type { WorkspaceState } from "../../app/workspace";
@@ -41,6 +42,9 @@ export function createArtifactsState(deps: UiDeps, ws: WorkspaceState) {
     fetch: (repos, options) => ops.list(repos, options),
     now: deps.manager.now,
     onReset: () => selection.clear(),
+    // 削除の確認中と削除中は取り直さない（確認した対象が変わらないように）
+    paused: (): boolean => bulkDelete.state().phase !== "idle",
+    merge: mergeList((a) => a.id),
   });
   const artifacts = createMemo(() => results.values().flatMap((r) => r.value));
   const summary = createMemo(() => summarizeArtifacts(artifacts(), results.now()));

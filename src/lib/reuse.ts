@@ -6,6 +6,11 @@ export function sameValue(a: unknown, b: unknown): boolean {
   return a === b || JSON.stringify(a) === JSON.stringify(b);
 }
 
+/** 一覧を取り直したときの合わせ方。全体が同じなら前の配列を、違えば変わっていない要素だけ前のものを使う */
+export function mergeList<T>(keyOf: (item: T) => string | number): (prev: T[], next: T[]) => T[] {
+  return (prev, next) => (sameValue(prev, next) ? prev : reuseUnchanged(prev, next, keyOf));
+}
+
 /** next の各要素について、prev に同じキーで同じ値のものがあればそちらを返す。並びは next のまま */
 export function reuseUnchanged<T>(prev: readonly T[], next: readonly T[], keyOf: (item: T) => string | number): T[] {
   const old = new Map(prev.map((item) => [keyOf(item), item]));

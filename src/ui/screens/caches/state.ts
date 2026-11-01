@@ -15,6 +15,7 @@ import {
   type CacheSortKey,
 } from "../../../features/caches/listing";
 import { repoKey } from "../../../features/workspace/repository";
+import { mergeList } from "../../../lib/reuse";
 import { toggleSort } from "../../../lib/sort";
 import type { UiDeps } from "../../app/context";
 import type { WorkspaceState } from "../../app/workspace";
@@ -37,6 +38,9 @@ export function createCachesState(deps: UiDeps, ws: WorkspaceState, active: Acce
     now: deps.manager.now,
     active,
     onReset: () => selection.clear(),
+    // 削除の確認中と削除中は取り直さない（確認した対象が変わらないように）
+    paused: (): boolean => bulkDelete.state().phase !== "idle",
+    merge: mergeList((c) => c.id),
   });
   const caches = createMemo(() => results.values().flatMap((r) => r.value));
   const summary = createMemo(() => summarizeCaches(caches(), results.now()));
