@@ -19,12 +19,15 @@ import { createSettingsState } from "../screens/settings/state";
 import "./app.css";
 import { UiContext, type UiDeps } from "./context";
 import { Header, routeOf, type Route } from "./Header";
-import { createAutoRefreshSetting, createPolling } from "./auto-refresh";
+import { createAutoRefreshSetting, createPolling, intervalForRequests } from "./auto-refresh";
 import { createWorkspaceState } from "./workspace";
 
-/** 自動更新の間隔。List は Search API（30 回/分）、Kanban は通常の API（5,000 回/時）を使い、Kanban は 1 回の更新で呼ぶ数が多いので長めにする */
-const ISSUES_REFRESH_MINUTES = 1;
-const KANBAN_REFRESH_MINUTES = 2;
+/**
+ * Issue タブの自動更新の間隔。呼ぶ数は所有者とプロジェクトの数で決まり、リポジトリの数には比例しないので固定にする。
+ * List は Search API（30 回/分）を所有者ごとに 1 回、Kanban は通常の API をプロジェクトごとに 2 回呼ぶので長めにする
+ */
+const ISSUES_REFRESH_MS = 60_000;
+const KANBAN_REFRESH_MS = 2 * 60_000;
 
 const currentRoute = (): Route => routeOf(location.hash);
 
@@ -37,28 +40,34 @@ export function App(props: { deps: UiDeps }) {
   onCleanup(() => window.removeEventListener("hashchange", onHash));
 
   const settings = createSettingsState(deps);
+  const autoRefresh = createAutoRefreshSetting(deps);
   const ws = createWorkspaceState(deps, settings.active);
   const artifacts = createArtifactsState(deps, ws);
   const caches = createCachesState(deps, ws, () => route() === "caches");
-  const workflows = createWorkflowListState(deps, ws, () => route() === "actions");
+  const workflows = createWorkflowListState(deps, ws, () => route() === "actions", autoRefresh.enabled);
   const dispatch = createDispatchState(deps, (repo) => workflows.reload(repo));
   const cleanup = createRunCleanupState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const kanban = createKanbanState(deps, ws, () => route() === "kanban");
   const connected = () => settings.active().length > 0;
 
-  const autoRefresh = createAutoRefreshSetting(deps);
-  createPolling({
-    when: () => autoRefresh.enabled() && connected() && route() === "issues",
-    intervalMs: ISSUES_REFRESH_MINUTES * 60_000,
-    run: issues.poll,
-  });
-  createPolling({
-    when: () => autoRefresh.enabled() && connected() && route() === "kanban",
-    intervalMs: KANBAN_REFRESH_MINUTES * 60_000,
-    run: kanban.poll,
-  });
-  const autoRefreshMinutes = () => (route() === "issues" ? ISSUES_REFRESH_MINUTES : route() === "kanban" ? KANBAN_REFRESH_MINUTES : null);
+  // 画面ごとの自動更新。リポジトリごとに呼ぶ画面は、選んでいるリポジトリの数から間隔を決める
+  // （アーティファクト・キャッシュは 1 リポジトリ 1 回、Actions はワークフローと実行履歴で 2 回）
+  const repoCount = () => ws.selectedRepos().length;
+  const refreshPlans: Array<{ route: Route; intervalMs: () => number; run: () => Promise<void> }> = [
+    { route: "artifacts", intervalMs: () => intervalForRequests(repoCount()), run: artifacts.results.poll },
+    { route: "caches", intervalMs: () => intervalForRequests(repoCount()), run: caches.results.poll },
+    { route: "actions", intervalMs: () => intervalForRequests(2 * repoCount()), run: workflows.results.poll },
+    { route: "issues", intervalMs: () => ISSUES_REFRESH_MS, run: issues.poll },
+    { route: "kanban", intervalMs: () => KANBAN_REFRESH_MS, run: kanban.poll },
+  ];
+  for (const plan of refreshPlans) {
+    createPolling({ when: () => autoRefresh.enabled() && connected() && route() === plan.route, intervalMs: plan.intervalMs, run: plan.run });
+  }
+  const autoRefreshMinutes = () => {
+    const plan = refreshPlans.find((p) => p.route === route());
+    return plan ? Math.round(plan.intervalMs() / 60_000) : null;
+  };
 
   const current = () => {
     switch (route()) {

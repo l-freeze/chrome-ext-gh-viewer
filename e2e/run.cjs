@@ -362,8 +362,8 @@ const step = async (name, fn) => {
       await page.clock.fastForward("00:02");
       await ciRow.getByText("Success").waitFor();
       assert.equal(runsCalls(), before + 1);
-      // 実行中のものがなくなったら、それ以上は問い合わせない
-      await page.clock.fastForward("05:00");
+      // 実行中のものがなくなったら、それ以上は問い合わせない（一覧全体の自動更新は 5 分ごとなので、その手前まで見る）
+      await page.clock.fastForward("03:00");
       await page.waitForTimeout(300);
       assert.equal(runsCalls(), before + 1);
       assert.equal(log.filter((l) => l.startsWith("GET /repos/acme-labs/data-pipeline/actions/runs")).length, 1);
@@ -406,6 +406,30 @@ const step = async (name, fn) => {
       assert.equal(await page.locator('.card[data-mark="kept"]').count(), 1);
     });
 
+    await step("自動更新: アーティファクトはリポジトリの数から決めた間隔で取り直し、削除の確認中は取り直さない", async () => {
+      await page.getByRole("link", { name: /^Artifacts/ }).click();
+      await page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+      // 6 リポジトリなら 1 回 6 回の呼び出しで、最短の 5 分ごと
+      assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("title"), "Refresh every 5 minutes while this screen is open");
+      const list = control.artifacts["acme-labs/web-console"];
+      list.unshift({ ...list[0], id: 7777, name: "nightly-e2e-bundle" });
+      await page.clock.fastForward("04:58");
+      await page.waitForTimeout(300);
+      assert.equal(await page.locator("td.cell-name", { hasText: "nightly-e2e-bundle" }).count(), 0);
+      await page.clock.fastForward("00:04");
+      await page.locator("td.cell-name", { hasText: "nightly-e2e-bundle" }).waitFor();
+
+      await page.getByRole("button", { name: /Select 3 older than 30 days/ }).click();
+      await page.getByRole("button", { name: "Delete 3" }).click();
+      list.unshift({ ...list[0], id: 7778, name: "while-confirming" });
+      await page.clock.fastForward("05:01");
+      await page.waitForTimeout(300);
+      assert.equal(await page.locator("td.cell-name", { hasText: "while-confirming" }).count(), 0, "確認中は取り直さない");
+      await page.getByRole("button", { name: "Cancel" }).click();
+      await page.clock.fastForward("05:01");
+      await page.locator("td.cell-name", { hasText: "while-confirming" }).waitFor();
+    });
+
     await step("自動更新: オフにすると取り直さず、オフのままになる", async () => {
       await page.getByRole("switch", { name: "Auto refresh" }).click();
       assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("aria-checked"), "false");
@@ -413,8 +437,12 @@ const step = async (name, fn) => {
       await page.clock.fastForward("05:00");
       await page.waitForTimeout(300);
       assert.deepEqual(log.slice(before), []);
+      // 再読み込みボタンは、オフでもいつでも使える
+      await page.getByRole("button", { name: "Refresh" }).click();
+      await page.waitForFunction(() => !document.querySelector(".row--skeleton"));
+      assert.ok(log.slice(before).some((l) => l.includes("/actions/artifacts")));
       await page.reload();
-      await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+      await page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
       assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("aria-checked"), "false");
     });
     await context.close();

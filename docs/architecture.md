@@ -99,6 +99,13 @@ ui/
 
 例: Issue タブの Kanban は、Projects という新しい API の分野とモデル（プロジェクト・列・項目）を扱うため、`features/projects` と `screens/kanban` を足しています。List（`features/issues` と `screens/issues`）とは独立しています。
 
+### 自動更新
+
+- オン・オフは `features/preferences` が保存する
+- いつ取り直すか（画面を開いていてページが見えている間、間隔、呼び出し数からの間隔の計算）は `ui/app/auto-refresh.ts`
+- どの画面をどの間隔で取り直すかは `ui/app/App.tsx` にまとめる
+- 何を取り直すかは各画面の状態の `poll()`。表示は消さず、変わったところだけ差し替える（`lib/reuse.ts`）。リポジトリごとに取得する一覧は `ui/lists/repo-results.ts` の `poll()` を使う
+
 ### ドラッグ＆ドロップ
 
 - カードを掴む・運ぶ・落とす位置の判定と、キーボードでの移動は、画面だけの処理として `screens/kanban/KanbanScreen.tsx` に置く

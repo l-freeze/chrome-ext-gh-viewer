@@ -16,7 +16,7 @@ const json = (route, body, status = 200, headers = {}) =>
  * @param {{ delayMs?: number }} options delayMs: アーティファクト一覧の応答を遅らせる（読み込み中の画面用）
  */
 function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) {
-  const artifacts = structuredClone(fx.artifactsByRepo);
+  const artifacts = control.artifacts;
   return async (route) => {
     const req = route.request();
     const url = new URL(req.url());
@@ -199,6 +199,7 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     runs: structuredClone(fx.runsByRepo),
     oldRuns: structuredClone(fx.oldRunsByRepo),
     caches: structuredClone(fx.cachesByRepo),
+    artifacts: structuredClone(fx.artifactsByRepo),
     issues: structuredClone(fx.issuesByOwner),
     projectItems: structuredClone(fx.projectItems),
     patches: [],

@@ -1,10 +1,12 @@
 // Actions タブ（ワークフロー一覧）の状態: リポジトリごとのワークフローと最新の実行。
-// 実行中・待機中のものがある間だけ、間隔をあけて最新の実行を取り直す。
+// 自動更新がオンなら、実行中・待機中のものがある間だけ、間隔をあけて最新の実行を取り直す。
 
-import { createEffect, createMemo, createSignal, onCleanup, type Accessor } from "solid-js";
+import { createMemo, createSignal, type Accessor } from "solid-js";
 import type { WorkflowWithRun } from "../../../features/actions/workflow";
 import type { Repository } from "../../../features/workspace/repository";
 import { mapWithConcurrency } from "../../../lib/concurrency";
+import { mergeList } from "../../../lib/reuse";
+import { createPolling } from "../../app/auto-refresh";
 import type { UiDeps } from "../../app/context";
 import type { WorkspaceState } from "../../app/workspace";
 import { createRepoResults } from "../../lists/repo-results";
@@ -18,13 +20,19 @@ export interface WorkflowGroup {
   workflows: WorkflowWithRun[];
 }
 
-export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active: Accessor<boolean>) {
+export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active: Accessor<boolean>, autoRefresh: Accessor<boolean>) {
   const ops = deps.manager.actions;
   const [text, setText] = createSignal("");
   const [hideDisabled, setHideDisabled] = createSignal(true);
 
   // タブを開いているときだけ読み込む
-  const results = createRepoResults<WorkflowWithRun[]>({ ws, fetch: (repos, options) => ops.list(repos, options), now: deps.manager.now, active });
+  const results = createRepoResults<WorkflowWithRun[]>({
+    ws,
+    fetch: (repos, options) => ops.list(repos, options),
+    now: deps.manager.now,
+    active,
+    merge: mergeList((w) => w.workflow.id),
+  });
 
   const groups = createMemo((): WorkflowGroup[] => {
     const terms = text().toLowerCase().split(/\s+/).filter(Boolean);
@@ -66,17 +74,11 @@ export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active
     });
   }
 
-  // 1 回終わるたびに pollTick を進めて次の回を予約する（取り直しが失敗しても止まらないように）。
-  // ブラウザのタブが裏にあるときは問い合わせず、次の回に回す
-  const [pollTick, setPollTick] = createSignal(0);
-  createEffect(() => {
-    pollTick();
-    if (!active() || reposWithRunning().length === 0) return;
-    const timer = setTimeout(async () => {
-      if (document.visibilityState !== "hidden") await pollRuns(reposWithRunning());
-      setPollTick((n) => n + 1);
-    }, RUNNING_POLL_INTERVAL_MS);
-    onCleanup(() => clearTimeout(timer));
+  // ブラウザのタブが裏にあるときは問い合わせない
+  createPolling({
+    when: () => autoRefresh() && active() && reposWithRunning().length > 0,
+    intervalMs: RUNNING_POLL_INTERVAL_MS,
+    run: () => pollRuns(reposWithRunning()),
   });
 
   return {
