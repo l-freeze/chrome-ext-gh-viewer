@@ -16,10 +16,8 @@ import { createRepoResults } from "../../lists/repo-results";
 /** 実行中・待機中の実行があるとき、状態を取り直す間隔 */
 export const RUNNING_POLL_INTERVAL_MS = 60_000;
 
-/** 実行した直後は状態が早く変わるので短い間隔で追い、しばらくしたら間隔を広げる */
-export const WATCH_FAST_INTERVAL_MS = 15_000;
-export const WATCH_FAST_FOR_MS = 5 * 60_000;
-export const WATCH_SLOW_INTERVAL_MS = 60_000;
+/** 実行したものの状態を確かめる間隔（依頼した直後の 1 回はすぐに確かめる） */
+export const WATCH_INTERVAL_MS = 60_000;
 /** 作られたはずの実行が見えないまま、この時間がたったら追うのをやめる */
 export const WATCH_NOT_FOUND_LIMIT_MS = 2 * 60_000;
 /** 実行の ID が返らなかったとき、一覧に新しい実行が現れるまでの目安 */
@@ -99,11 +97,10 @@ export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active
     const now = deps.manager.now;
     const startedAt = now();
     const later = (fn: () => void) => {
-      const elapsed = now() - startedAt;
       const timer = setTimeout(() => {
         watchTimers.delete(timer);
         fn();
-      }, elapsed < WATCH_FAST_FOR_MS ? WATCH_FAST_INTERVAL_MS : WATCH_SLOW_INTERVAL_MS);
+      }, WATCH_INTERVAL_MS);
       watchTimers.add(timer);
     };
     const check = async () => {

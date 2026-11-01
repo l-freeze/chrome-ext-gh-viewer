@@ -401,13 +401,16 @@ const step = async (name, fn) => {
       assert.equal(runGets(), 1, "依頼した直後に 1 回問い合わせる（まだ見えない）");
       await row.getByText("Failure").waitFor();
 
-      await page.clock.fastForward("00:15");
+      await page.clock.fastForward("00:59");
+      await page.waitForTimeout(300);
+      assert.equal(runGets(), 1, "1 分たつまでは問い合わせない");
+      await page.clock.fastForward("00:02");
       await row.getByText("Queued").waitFor();
       run.status = "in_progress";
-      await page.clock.fastForward("00:15");
+      await page.clock.fastForward("01:00");
       await row.getByText("In progress").waitFor();
       Object.assign(run, { status: "completed", conclusion: "success" });
-      await page.clock.fastForward("00:15");
+      await page.clock.fastForward("01:00");
       await row.getByText("Success").waitFor();
       const done = runGets();
       // 完了したら追うのをやめる。一覧全体の取り直しもしない（自動更新はオフ）
