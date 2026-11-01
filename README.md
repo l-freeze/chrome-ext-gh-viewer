@@ -67,18 +67,18 @@ echo "WXT_GITHUB_CLIENT_ID=<your client id>" > .env.local
 
 ```
 src/
-  api/          GitHub REST API の型・検証・呼び出し・エラー分類・Device Flow（画面に依存しない）
-  domain/       絞り込み・並べ替え・集計・表示用の整形（純粋な関数）
-  services/     認証情報の保存、トークンごとのリポジトリ把握と呼び出し先の振り分け
-  platform/     chrome.storage / chrome.downloads との接続
-  i18n/         英語・日本語の文言
-  ui/           Solid の画面と状態
-  entrypoints/  拡張機能の入口（background と管理画面）
-test/           単体テスト
-e2e/            拡張機能を読み込んだ E2E テスト
+  features/      業務の機能（workspace / settings / artifacts / caches / actions / issues）
+  integrations/  GitHub という外部サービスとの接続
+  infrastructure/ 汎用の技術基盤（HTTP 送信・保存先・ダウンロード）
+  lib/           仕組みだけの道具（検証・同時実行・並べ替え・時間）
+  composition/   具体的な実装を選んで機能をつなぐ
+  ui/            Solid の画面
+  entrypoints/   拡張機能の入口（background と管理画面）
+tests/           単体テスト（持ち主ごと）
+e2e/             拡張機能を読み込んだ E2E テスト
 ```
 
-Issue への操作（クローズ、ラベル変更など）は、`api/client.ts` に呼び出しを、`ui/state/issues.ts` に結果を一覧へ反映する処理を足して追加する想定です。
+境界と依存の向き、機能を足すときの判断は [docs/architecture.md](docs/architecture.md) にまとめています。
 
 ## ライセンス
 
