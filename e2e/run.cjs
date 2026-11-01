@@ -25,7 +25,7 @@ const step = async (name, fn) => {
 
 (async () => {
   // ---- 英語・ライト ---------------------------------------------------------
-  const { context, page, id, log, errors, dispatches } = await launch();
+  const { context, page, id, log, errors, dispatches, deletes } = await launch();
 
   await step("未接続ならオンボーディングを表示", async () => {
     await page.goto(`chrome-extension://${id}/manager.html`);
@@ -186,6 +186,55 @@ const step = async (name, fn) => {
     await dialog.getByText(/On legacy, this workflow has no workflow_dispatch trigger/).waitFor();
     await dialog.getByRole("button", { name: "Close" }).click();
     assert.equal(dispatches.length, 1);
+  });
+
+  await step("キャッシュ: 全リポジトリのキャッシュを一覧し、PR のキャッシュをまとめて消す", async () => {
+    await page.getByRole("link", { name: /^Caches/ }).click();
+    await page.locator("td.cell-name", { hasText: "Linux-node-modules-8c1f" }).waitFor();
+    assert.equal(await page.locator("tbody tr").count(), 7);
+    await page.getByText("1 repository could not be read").waitFor();
+    await page.screenshot({ path: path.join(OUT, "15-caches.png") });
+    await page.getByRole("button", { name: /Select 3 pull request caches/ }).click();
+    await page.getByText("3 selected").waitFor();
+    await page.getByRole("button", { name: "Delete 3" }).click();
+    await page.getByText(/Permanently delete 3 caches/).waitFor();
+    assert.equal(deletes.filter((d) => d.startsWith("cache")).length, 0, "確認前には消さない");
+    await page.screenshot({ path: path.join(OUT, "16-caches-confirm.png") });
+    await page.getByRole("button", { name: "Delete permanently" }).click();
+    await page.getByText(/Deleted 3 caches/).waitFor();
+    assert.equal(deletes.filter((d) => d.startsWith("cache")).length, 3);
+    assert.equal(await page.locator("tbody tr").count(), 4);
+    assert.equal(await page.locator("td.cell-branch", { hasText: "PR #" }).count(), 0);
+  });
+
+  await step("実行履歴の整理: 条件で検索し、リポジトリを選び、確認してから消す", async () => {
+    await page.getByRole("link", { name: /^Actions/ }).click();
+    await page.getByRole("tab", { name: "Clean up run history" }).click();
+    await page.getByLabel("Result").selectOption("failure");
+    await page.getByRole("button", { name: "Find runs" }).click();
+    // web-console: CI 15 件 + Deploy 4 件、data-pipeline: 4 件（作成から 35 日以上で失敗のもの）
+    await page.getByText("23 runs match (repositories: 2).").waitFor();
+    const searches = log.filter((l) => l.includes("/actions/runs?") && l.includes("created="));
+    assert.ok(searches.every((l) => l.includes("status=failure")), "結果の条件を API に渡す");
+    await page.screenshot({ path: path.join(OUT, "17-runs-results.png") });
+    // data-pipeline を外す
+    await page.getByRole("checkbox", { name: "acme-labs/data-pipeline" }).uncheck();
+    await page.getByText("19 runs selected (repositories: 1)").waitFor();
+    // 条件を変えると、検索し直すまで消せない
+    await page.getByLabel("Result").selectOption("all");
+    await page.getByText(/The conditions changed/).waitFor();
+    assert.equal(await page.getByRole("button", { name: "Delete 19 runs" }).isDisabled(), true);
+    await page.getByLabel("Result").selectOption("failure");
+    await page.getByRole("button", { name: "Delete 19 runs" }).click();
+    await page.getByText(/Permanently delete 19 workflow runs/).waitFor();
+    await page.getByText(/This sends 19 requests/).waitFor();
+    await page.screenshot({ path: path.join(OUT, "18-runs-confirm.png") });
+    assert.equal(deletes.filter((d) => d.startsWith("run")).length, 0, "確認前には消さない");
+    await page.getByRole("button", { name: "Delete permanently" }).click();
+    await page.getByText("Deleted 19 runs.").waitFor();
+    assert.equal(deletes.filter((d) => d.startsWith("run")).length, 19);
+    // 外したリポジトリの分だけが残る
+    await page.getByText("4 runs match (repositories: 1).").waitFor();
   });
 
   assert.deepEqual(errors, [], "page errors");

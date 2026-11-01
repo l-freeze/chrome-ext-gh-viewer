@@ -4,6 +4,7 @@ import {
   decodeArrayOf,
   decodeArtifactPage,
   decodeBranchNames,
+  decodeCachePage,
   decodeEnvironmentNames,
   decodeWorkflowPage,
   decodeWorkflowRunPage,
@@ -16,6 +17,7 @@ import {
 import { DecodeError, GitHubApiError } from "./errors";
 import { GitHubHttp, type HttpOptions } from "./http";
 import type {
+  ActionsCache,
   Artifact,
   Issue,
   Owner,
@@ -133,6 +135,46 @@ export class GitHubClient {
     const { perPage = PER_PAGE, ...rest } = options;
     const { data } = await this.http.json(`${repoPath(repo)}/actions/runs`, { ...rest, query: { per_page: perPage } });
     return decode(() => decodeWorkflowRunPage(data, repo));
+  }
+
+  /**
+   * 条件に合う実行履歴を新しい順に取得する。GitHub は条件付きの検索で最大 1,000 件までしか返さないので、
+   * それを超える分は返らない（truncated が true になる）
+   */
+  async listRuns(
+    repo: RepoRef,
+    filter: { created?: string; status?: string },
+    options: CallOptions & { maxResults?: number } = {},
+  ): Promise<{ runs: WorkflowRun[]; totalCount: number; truncated: boolean }> {
+    const { maxResults = 1000, ...rest } = options;
+    const runs: WorkflowRun[] = [];
+    let totalCount = 0;
+    const query = { per_page: PER_PAGE, ...(filter.created ? { created: filter.created } : {}), ...(filter.status ? { status: filter.status } : {}) };
+    for await (const page of this.http.paginate(`${repoPath(repo)}/actions/runs`, { ...rest, query })) {
+      const o = page as { total_count?: unknown };
+      if (typeof o.total_count === "number") totalCount = o.total_count;
+      runs.push(...decode(() => decodeWorkflowRunPage(page, repo)));
+      if (runs.length >= maxResults) break;
+    }
+    return { runs: runs.slice(0, maxResults), totalCount, truncated: totalCount > Math.min(runs.length, maxResults) };
+  }
+
+  async deleteRun(run: Pick<WorkflowRun, "id" | "repo">, options: CallOptions = {}): Promise<void> {
+    await this.http.request(`${repoPath(run.repo)}/actions/runs/${run.id}`, { ...options, method: "DELETE" });
+  }
+
+  /** キャッシュを最後に使われた新しい順に全部取得する */
+  async listRepoCaches(repo: RepoRef, options: CallOptions = {}): Promise<ActionsCache[]> {
+    const caches: ActionsCache[] = [];
+    const query = { per_page: PER_PAGE, sort: "last_accessed_at", direction: "desc" };
+    for await (const page of this.http.paginate(`${repoPath(repo)}/actions/caches`, { ...options, query })) {
+      caches.push(...decode(() => decodeCachePage(page, repo)));
+    }
+    return caches;
+  }
+
+  async deleteCache(cache: Pick<ActionsCache, "id" | "repo">, options: CallOptions = {}): Promise<void> {
+    await this.http.request(`${repoPath(cache.repo)}/actions/caches/${cache.id}`, { ...options, method: "DELETE" });
   }
 
   /** ファイルの中身をテキストで取得する（ワークフローの YAML を読むため） */
