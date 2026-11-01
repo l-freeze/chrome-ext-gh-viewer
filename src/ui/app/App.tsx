@@ -45,7 +45,7 @@ export function App(props: { deps: UiDeps }) {
   const artifacts = createArtifactsState(deps, ws);
   const caches = createCachesState(deps, ws, () => route() === "caches");
   const workflows = createWorkflowListState(deps, ws, () => route() === "actions", autoRefresh.enabled);
-  const dispatch = createDispatchState(deps, (repo) => workflows.reload(repo));
+  const dispatch = createDispatchState(deps, (repo, run) => workflows.afterDispatch(repo, run));
   const cleanup = createRunCleanupState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const kanban = createKanbanState(deps, ws, () => route() === "kanban");

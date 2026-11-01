@@ -245,12 +245,14 @@ const step = async (name, fn) => {
     assert.equal(await dialog.getByLabel(/^replicas/).inputValue(), "3");
     await dialog.getByRole("button", { name: "Review" }).click();
     await dialog.getByRole("button", { name: "Run workflow" }).click();
-    await dialog.getByText(/The run was requested on master/).waitFor();
+    await dialog.getByText(/The run was started on master/).waitFor();
+    assert.match(await dialog.getByRole("link", { name: /Open the run on GitHub/ }).getAttribute("href"), /\/actions\/runs\/\d+$/);
     await page.screenshot({ path: path.join(OUT, "13-dispatch-done.png") });
     assert.equal(dispatches.length, 1);
     assert.deepEqual(dispatches[0].body, {
       ref: "master",
       inputs: { environment: "staging", level: "debug", dry_run: "false", replicas: "3" },
+      return_run_details: true,
     });
     await dialog.getByRole("button", { name: "Close" }).click();
   });
@@ -367,6 +369,53 @@ const step = async (name, fn) => {
       await page.waitForTimeout(300);
       assert.equal(runsCalls(), before + 1);
       assert.equal(log.filter((l) => l.startsWith("GET /repos/acme-labs/data-pipeline/actions/runs")).length, 1);
+    });
+    await context.close();
+  }
+
+  // ---- 実行したワークフローの追跡 ----------------------------------------------------
+  {
+    const { context, page, id, log, control } = await launch();
+    await step("Actions: 実行したものは、待機中から完了まで状態を追う（自動更新がオフでも）", async () => {
+      await page.clock.install();
+      control.completeAllRuns();
+      await connect(page, id);
+      await page.goto(`chrome-extension://${id}/manager.html#actions`);
+      const row = page.locator("tr", { has: page.getByRole("link", { name: "Deploy", exact: true }) });
+      await row.getByText("Failure").waitFor();
+      await page.getByRole("switch", { name: "Auto refresh" }).click();
+      // 作られた直後は 1 回だけ見えない（GitHub 側の反映の遅れ）
+      control.hideRunGets = 1;
+
+      await page.getByRole("button", { name: "Run Deploy" }).click();
+      const dialog = page.locator("dialog[open]");
+      await dialog.getByLabel(/^environment/).selectOption("staging");
+      await dialog.getByLabel(/^replicas/).fill("3");
+      await dialog.getByRole("button", { name: "Review" }).click();
+      await dialog.getByRole("button", { name: "Run workflow" }).click();
+      await dialog.getByText(/The run was started on master/).waitFor();
+      await dialog.getByRole("button", { name: "Close" }).click();
+      const run = control.dispatchedRuns[0];
+      const runGets = () => log.filter((l) => l === `GET /repos/acme-labs/web-console/actions/runs/${run.id}`).length;
+      await page.waitForTimeout(300);
+      assert.equal(runGets(), 1, "依頼した直後に 1 回問い合わせる（まだ見えない）");
+      await row.getByText("Failure").waitFor();
+
+      await page.clock.fastForward("00:15");
+      await row.getByText("Queued").waitFor();
+      run.status = "in_progress";
+      await page.clock.fastForward("00:15");
+      await row.getByText("In progress").waitFor();
+      Object.assign(run, { status: "completed", conclusion: "success" });
+      await page.clock.fastForward("00:15");
+      await row.getByText("Success").waitFor();
+      const done = runGets();
+      // 完了したら追うのをやめる。一覧全体の取り直しもしない（自動更新はオフ）
+      const before = log.length;
+      await page.clock.fastForward("10:00");
+      await page.waitForTimeout(300);
+      assert.equal(runGets(), done);
+      assert.deepEqual(log.slice(before), []);
     });
     await context.close();
   }

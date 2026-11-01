@@ -39,6 +39,12 @@ export interface RunSearchResult {
   truncated: boolean;
 }
 
+/** 実行を依頼して作られた実行。GitHub が返さなかったときは null で表す */
+export interface DispatchedRun {
+  id: number;
+  htmlUrl: string;
+}
+
 /** 画面から呼ぶ操作 */
 export interface ActionsOperations {
   /** リポジトリごとにワークフローと最新の実行を集める */
@@ -51,8 +57,10 @@ export interface ActionsOperations {
   readDispatchSpec(target: DispatchTarget, ref: string): Promise<DispatchSpec>;
   /** 実行の前の確認用。入力を検証し、誤りか、送る値を返す（実行はしない） */
   reviewDispatch(request: DispatchRequest): DispatchReview;
-  /** 入力を検証してから実行を依頼する（入力は DispatchRequest の形） */
-  dispatch(request: unknown): Promise<void>;
+  /** 入力を検証してから実行を依頼する（入力は DispatchRequest の形）。作られた実行が分かればそれを返す */
+  dispatch(request: unknown): Promise<DispatchedRun | null>;
+  /** 1 つの実行の今の状態。まだ見えない（作られた直後など）ときは null */
+  readRun(repo: RepoRef, runId: number): Promise<WorkflowRun | null>;
   searchRuns(
     repos: readonly Repository[],
     criteria: RunCleanupCriteria,
@@ -68,7 +76,9 @@ export interface ActionsSource {
   readWorkflowFile(repo: RepoRef, path: string, ref: string): Promise<string>;
   listBranches(repo: RepoRef): Promise<string[]>;
   listEnvironments(repo: RepoRef): Promise<string[]>;
-  dispatch(repo: RepoRef, workflowId: number, ref: string, inputs: Record<string, string>): Promise<void>;
+  dispatch(repo: RepoRef, workflowId: number, ref: string, inputs: Record<string, string>): Promise<DispatchedRun | null>;
+  /** 見つからなければ null */
+  readRun(repo: RepoRef, runId: number): Promise<WorkflowRun | null>;
   searchRuns(repo: RepoRef, filter: { created: string; status: string }, maxResults: number, signal?: AbortSignal): Promise<RunSearchResult>;
   removeRun(run: WorkflowRun, signal?: AbortSignal): Promise<void>;
 }

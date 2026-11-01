@@ -1,6 +1,7 @@
 import {
   deleteRun,
   dispatchWorkflow,
+  getRun,
   listRecentRuns,
   listWorkflows,
   searchRuns,
@@ -45,7 +46,18 @@ export function createGitHubActionsSource(httpFor: (repo: RepoRef) => GitHubHttp
     readWorkflowFile: (repo, path, ref) => getFileText(httpFor(repo), repo, path, ref),
     listBranches: (repo) => listBranches(httpFor(repo), repo),
     listEnvironments: (repo) => listEnvironments(httpFor(repo), repo),
-    dispatch: (repo, workflowId, ref, inputs) => dispatchWorkflow(httpFor(repo), repo, workflowId, ref, inputs),
+    async dispatch(repo, workflowId, ref, inputs) {
+      const run = await dispatchWorkflow(httpFor(repo), repo, workflowId, ref, inputs);
+      return run && { id: run.workflow_run_id, htmlUrl: run.html_url };
+    },
+    async readRun(repo, runId) {
+      try {
+        return toRun(await getRun(httpFor(repo), repo, runId), repo);
+      } catch (e) {
+        if (isGitHubApiError(e, "not_found")) return null;
+        throw e;
+      }
+    },
     async searchRuns(repo, filter, maxResults, signal) {
       const res = await searchRuns(httpFor(repo), repo, filter, { maxResults, ...call(signal) });
       return { runs: res.runs.map((r) => toRun(r, repo)), truncated: res.truncated };

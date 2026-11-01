@@ -68,6 +68,15 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       return json(route, { total_count: list.length, actions_caches: list });
     }
     m = /^\/repos\/([^/]+)\/([^/]+)\/actions\/runs\/(\d+)$/.exec(p);
+    if (m && req.method() === "GET") {
+      // 作られた直後の実行がまだ見えない様子を再現する（hideRunGets 回だけ 404）
+      if (control.hideRunGets > 0) {
+        control.hideRunGets--;
+        return json(route, { message: "Not Found" }, 404);
+      }
+      const run = (control.runs[`${m[1]}/${m[2]}`] ?? []).find((r) => r.id === Number(m[3]));
+      return run ? json(route, run) : json(route, { message: "Not Found" }, 404);
+    }
     if (m && req.method() === "DELETE") {
       const key = `${m[1]}/${m[2]}`;
       control.oldRuns[key] = (control.oldRuns[key] ?? []).filter((r) => r.id !== Number(m[3]));
@@ -117,8 +126,20 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
     }
     m = /^\/repos\/([^/]+)\/([^/]+)\/actions\/workflows\/(\d+)\/dispatches$/.exec(p);
     if (m && req.method() === "POST") {
-      dispatches.push({ repo: `${m[1]}/${m[2]}`, workflowId: Number(m[3]), body: JSON.parse(req.postData() ?? "{}") });
-      return route.fulfill({ status: 204 });
+      const key = `${m[1]}/${m[2]}`;
+      const body = JSON.parse(req.postData() ?? "{}");
+      dispatches.push({ repo: key, workflowId: Number(m[3]), body });
+      // GitHub と同じく、受け付けた実行を待機中として作る
+      const id = control.nextRunId++;
+      const run = {
+        id, workflow_id: Number(m[3]), run_number: id - 90000, status: "queued", conclusion: null, event: "workflow_dispatch",
+        head_branch: body.ref, actor: fx.viewer, created_at: new Date().toISOString(), updated_at: new Date().toISOString(),
+        html_url: `https://github.com/${key}/actions/runs/${id}`,
+      };
+      (control.runs[key] ??= []).unshift(run);
+      control.dispatchedRuns.push(run);
+      if (!body.return_run_details) return route.fulfill({ status: 204 });
+      return json(route, { workflow_run_id: id, run_url: `https://api.github.com/repos/${key}/actions/runs/${id}`, html_url: run.html_url });
     }
     m = /^\/(orgs|users)\/([^/]+)\/projectsV2(?:\/(\d+)(?:\/(fields|items)(?:\/(\d+))?)?)?$/.exec(p);
     if (m) {
@@ -203,6 +224,9 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     issues: structuredClone(fx.issuesByOwner),
     projectItems: structuredClone(fx.projectItems),
     patches: [],
+    nextRunId: 90001,
+    dispatchedRuns: [],
+    hideRunGets: 0,
     failMoves: false,
     completeAllRuns() {
       for (const list of Object.values(this.runs))

@@ -1,9 +1,11 @@
 // Actions タブ（ワークフロー一覧）の状態: リポジトリごとのワークフローと最新の実行。
-// 自動更新がオンなら、実行中・待機中のものがある間だけ、間隔をあけて最新の実行を取り直す。
+// - 自動更新がオンなら、実行中・待機中のものがある間だけ、間隔をあけて最新の実行を取り直す
+// - この画面から実行したものは、自動更新のオン・オフに関係なく、完了するまでその実行の状態を追う
 
-import { createMemo, createSignal, type Accessor } from "solid-js";
-import type { WorkflowWithRun } from "../../../features/actions/workflow";
-import type { Repository } from "../../../features/workspace/repository";
+import { createMemo, createSignal, onCleanup, type Accessor } from "solid-js";
+import type { DispatchedRun } from "../../../features/actions/ports";
+import { isFinished, withLatestRun, type WorkflowWithRun } from "../../../features/actions/workflow";
+import { toRepoRef, type Repository } from "../../../features/workspace/repository";
 import { mapWithConcurrency } from "../../../lib/concurrency";
 import { mergeList } from "../../../lib/reuse";
 import { createPolling } from "../../app/auto-refresh";
@@ -13,6 +15,15 @@ import { createRepoResults } from "../../lists/repo-results";
 
 /** 実行中・待機中の実行があるとき、状態を取り直す間隔 */
 export const RUNNING_POLL_INTERVAL_MS = 60_000;
+
+/** 実行した直後は状態が早く変わるので短い間隔で追い、しばらくしたら間隔を広げる */
+export const WATCH_FAST_INTERVAL_MS = 15_000;
+export const WATCH_FAST_FOR_MS = 5 * 60_000;
+export const WATCH_SLOW_INTERVAL_MS = 60_000;
+/** 作られたはずの実行が見えないまま、この時間がたったら追うのをやめる */
+export const WATCH_NOT_FOUND_LIMIT_MS = 2 * 60_000;
+/** 実行の ID が返らなかったとき、一覧に新しい実行が現れるまでの目安 */
+export const DISPATCH_RELOAD_DELAY_MS = 4000;
 
 export interface WorkflowGroup {
   repo: Repository;
@@ -81,8 +92,46 @@ export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active
     run: () => pollRuns(reposWithRunning()),
   });
 
+  // 実行した実行を、完了するまで追う。ページが見えていない間は問い合わせず、次の回に回す
+  const watchTimers = new Set<ReturnType<typeof setTimeout>>();
+  onCleanup(() => watchTimers.forEach(clearTimeout));
+  function watchRun(repo: Repository, runId: number) {
+    const now = deps.manager.now;
+    const startedAt = now();
+    const later = (fn: () => void) => {
+      const elapsed = now() - startedAt;
+      const timer = setTimeout(() => {
+        watchTimers.delete(timer);
+        fn();
+      }, elapsed < WATCH_FAST_FOR_MS ? WATCH_FAST_INTERVAL_MS : WATCH_SLOW_INTERVAL_MS);
+      watchTimers.add(timer);
+    };
+    const check = async () => {
+      if (document.visibilityState === "hidden") return later(check);
+      let run;
+      try {
+        run = await ops.readRun(toRepoRef(repo), runId);
+      } catch {
+        return later(check);
+      }
+      if (run === null) {
+        if (now() - startedAt < WATCH_NOT_FOUND_LIMIT_MS) later(check);
+        return;
+      }
+      const latest = run;
+      results.update((r, list) => (r.id === repo.id ? withLatestRun(list, latest) : list));
+      if (!isFinished(run)) later(check);
+    };
+    void check();
+  }
+
   return {
     results,
+    /** 実行を依頼できたら呼ぶ。作られた実行が分かればすぐに一覧に出して追い、分からなければ少し待ってリポジトリを取り直す */
+    afterDispatch(repo: Repository, run: DispatchedRun | null) {
+      if (run) watchRun(repo, run.id);
+      else setTimeout(() => results.reload([repo]), DISPATCH_RELOAD_DELAY_MS);
+    },
     text,
     setText,
     hideDisabled,
@@ -90,8 +139,6 @@ export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active
     groups,
     count: createMemo(() => groups().reduce((n, g) => n + g.workflows.length, 0)),
     total: createMemo(() => results.values().reduce((n, r) => n + r.value.length, 0)),
-    /** 1 つのリポジトリだけ取り直す（実行後に最新の実行を反映するため） */
-    reload: (repo: Repository) => results.reload([repo]),
   };
 }
 

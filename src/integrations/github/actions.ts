@@ -117,7 +117,26 @@ export async function deleteRun(http: GitHubHttp, repo: RepoPath, id: number, ca
   await http.request(`${repoPath(repo)}/actions/runs/${id}`, { ...call, method: "DELETE" });
 }
 
-/** workflow_dispatch でワークフローを実行する。入力値は文字列で送る（GitHub の画面と同じ） */
+export async function getRun(http: GitHubHttp, repo: RepoPath, id: number, call: Call = {}): Promise<GitHubRun> {
+  const { data } = await http.json(`${repoPath(repo)}/actions/runs/${id}`, call);
+  return decode(() => readRun(data));
+}
+
+/** 実行を依頼したときに GitHub が返す、作られた実行 */
+export interface GitHubDispatchedRun {
+  workflow_run_id: number;
+  html_url: string;
+}
+
+export function readDispatchedRun(v: unknown, path = "dispatch"): GitHubDispatchedRun {
+  const o = obj(v, path);
+  return { workflow_run_id: num(o, "workflow_run_id", path), html_url: str(o, "html_url", path) };
+}
+
+/**
+ * workflow_dispatch でワークフローを実行する。入力値は文字列で送る（GitHub の画面と同じ）。
+ * return_run_details を付けて、作られた実行の ID を受け取る。返らなかったとき（204）は null
+ */
 export async function dispatchWorkflow(
   http: GitHubHttp,
   repo: RepoPath,
@@ -125,10 +144,14 @@ export async function dispatchWorkflow(
   ref: string,
   inputs: Record<string, string>,
   call: Call = {},
-): Promise<void> {
-  await http.request(`${repoPath(repo)}/actions/workflows/${workflowId}/dispatches`, {
+): Promise<GitHubDispatchedRun | null> {
+  const response = await http.request(`${repoPath(repo)}/actions/workflows/${workflowId}/dispatches`, {
     ...call,
     method: "POST",
-    body: { ref, inputs },
+    body: { ref, inputs, return_run_details: true },
   });
+  if (response.status === 204) return null;
+  const text = await response.text();
+  if (text.trim() === "") return null;
+  return decode(() => readDispatchedRun(JSON.parse(text)));
 }

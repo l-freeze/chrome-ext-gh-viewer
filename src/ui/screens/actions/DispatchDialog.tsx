@@ -211,11 +211,11 @@ export function DispatchDialog(props: { state: DispatchState }) {
                 {(st) => (
                   <>
                     <p role="status">
-                      <Icon name="check" /> {t("dispatch.done", { ref: st().ref })}
+                      <Icon name="check" /> {st().runUrl ? t("dispatch.doneTracked", { ref: st().ref }) : t("dispatch.done", { ref: st().ref })}
                     </p>
                     <Footer>
-                      <a class="button button--ghost" href={st().target.workflow.htmlUrl} target="_blank" rel="noreferrer">
-                        {t("dispatch.openOnGitHub")}
+                      <a class="button button--ghost" href={st().runUrl ?? st().target.workflow.htmlUrl} target="_blank" rel="noreferrer">
+                        {st().runUrl ? t("dispatch.openRun") : t("dispatch.openOnGitHub")}
                         <Icon name="external" size={14} />
                       </a>
                       <button type="button" class="button button--primary" onClick={() => s.close()}>

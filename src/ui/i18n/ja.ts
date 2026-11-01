@@ -179,6 +179,8 @@ export const ja: Messages = {
   "dispatch.run": "実行する",
   "dispatch.running": "実行を依頼しています…",
   "dispatch.done": "{ref} で実行を依頼しました。一覧に表示されるまで数秒かかることがあります。",
+  "dispatch.doneTracked": "{ref} で実行を始めました。終わるまで、一覧で状態を追います。",
+  "dispatch.openRun": "GitHub で実行を開く",
   "dispatch.openOnGitHub": "GitHub で開く",
   "dispatch.failed": "実行を開始できませんでした。",
 
