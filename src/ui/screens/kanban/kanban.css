@@ -1,0 +1,293 @@
+/* ---- カンバン ------------------------------------------------------------ */
+
+.kanban__hint {
+  margin: 0 0 0 auto;
+}
+
+/* 表示する項目の種類（所有者の選択と同じ形のチップ） */
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 28px;
+  padding: 0 10px 0 8px;
+  border-radius: 14px;
+  border: 1px solid var(--border-strong);
+  background: var(--surface);
+  color: var(--text-2);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+}
+.chip[aria-pressed="true"] {
+  background: var(--text);
+  border-color: var(--text);
+  color: var(--surface);
+}
+.chip__check {
+  display: inline-grid;
+  place-items: center;
+  width: 14px;
+  height: 14px;
+  border-radius: 3px;
+  border: 1px solid currentColor;
+}
+.chip__check .icon {
+  visibility: hidden;
+}
+.chip[aria-pressed="true"] .chip__check .icon {
+  visibility: visible;
+}
+
+.notice--error {
+  align-items: flex-start;
+  justify-content: space-between;
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.notice--error p {
+  margin: 0;
+}
+
+/* プロジェクトごとの枠（縦に並べ、折りたためる） */
+.board {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.board__head {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding-right: 8px;
+}
+.board__toggle {
+  display: flex;
+  flex: 1;
+  min-width: 0;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border: 0;
+  background: transparent;
+  color: var(--text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.board__toggle strong {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.board__toggle .muted {
+  white-space: nowrap;
+}
+.board__chevron {
+  display: inline-grid;
+  place-items: center;
+  color: var(--text-3);
+  transition: transform 0.15s ease;
+}
+.board__toggle[aria-expanded="true"] .board__chevron {
+  transform: rotate(90deg);
+}
+.board__count {
+  margin-left: 4px;
+  font-size: 12px;
+  color: var(--text-3);
+  white-space: nowrap;
+}
+.board__link {
+  display: inline-grid;
+  place-items: center;
+  width: 28px;
+  height: 28px;
+  border-radius: var(--radius);
+  color: var(--text-3);
+}
+.board__link:hover {
+  background: var(--surface-2);
+  color: var(--text);
+}
+.board__body {
+  border-top: 1px solid var(--border);
+}
+.board__message {
+  margin: 0;
+  padding: 10px 12px;
+}
+
+/* 列は横に並べ、収まらなければ枠の中だけを横にスクロールする */
+.columns {
+  display: flex;
+  gap: 10px;
+  padding: 12px;
+  overflow-x: auto;
+}
+.column {
+  display: flex;
+  flex: 0 0 272px;
+  flex-direction: column;
+  border-radius: var(--radius);
+  background: var(--surface-2);
+  outline: 2px solid transparent;
+  outline-offset: -2px;
+}
+.column--over {
+  outline-color: var(--accent);
+  background: var(--accent-soft);
+}
+.column__head {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px 4px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.column__name {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.column__count {
+  margin-left: auto;
+  font-weight: 400;
+  color: var(--text-3);
+  font-variant-numeric: tabular-nums;
+}
+.column__items {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 6px;
+  min-height: 56px;
+  margin: 0;
+  padding: 4px 8px 8px;
+  list-style: none;
+}
+
+/* GitHub の選択肢の色 */
+.swatch {
+  flex: none;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  border: 1px solid rgb(0 0 0 / 0.12);
+  background: #8c959f;
+}
+.swatch[data-color="BLUE"] {
+  background: #218bff;
+}
+.swatch[data-color="GREEN"] {
+  background: #2da44e;
+}
+.swatch[data-color="YELLOW"] {
+  background: #d4a72c;
+}
+.swatch[data-color="ORANGE"] {
+  background: #e16f24;
+}
+.swatch[data-color="RED"] {
+  background: #e5534b;
+}
+.swatch[data-color="PINK"] {
+  background: #e85aad;
+}
+.swatch[data-color="PURPLE"] {
+  background: #a475f9;
+}
+
+.card {
+  padding: 8px 10px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 1px 1px rgb(0 0 0 / 0.04);
+}
+.card[draggable="true"] {
+  cursor: grab;
+}
+.card:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 1px;
+}
+.card--dragging {
+  opacity: 0.4;
+}
+.card--moving {
+  opacity: 0.6;
+}
+.card__meta {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  color: var(--text-3);
+}
+.card__meta .mono {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.card__title {
+  display: block;
+  margin-top: 2px;
+  color: var(--text);
+  font-weight: 500;
+  overflow-wrap: anywhere;
+}
+.card__foot {
+  display: flex;
+  align-items: flex-end;
+  gap: 6px;
+  margin-top: 4px;
+}
+.card__labels {
+  flex: 1;
+  min-width: 0;
+}
+.card__assignees {
+  display: flex;
+  flex: none;
+}
+.card__assignees span + span {
+  margin-left: -4px;
+}
+
+/* 項目の種類と状態 */
+.kind {
+  flex: none;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #8c959f;
+}
+.kind--open {
+  background: #1f883d;
+}
+.kind--closed,
+.kind--merged {
+  background: #8250df;
+}
+.kind--draft {
+  background: transparent;
+  border: 1.5px dashed var(--text-3);
+}
+
+@media (max-width: 640px) {
+  .kanban__hint {
+    margin-left: 0;
+  }
+  .column {
+    flex-basis: 240px;
+  }
+}

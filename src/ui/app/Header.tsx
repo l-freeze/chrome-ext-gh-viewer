@@ -1,4 +1,4 @@
-import { For, Show, type Accessor } from "solid-js";
+import { createSignal, For, Show, type Accessor } from "solid-js";
 import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
 import { formatBytes } from "../format";
@@ -6,7 +6,24 @@ import { useUi } from "./context";
 import type { WorkspaceState } from "./workspace";
 import "./header.css";
 
-export type Route = "artifacts" | "caches" | "actions" | "issues" | "settings";
+export type Route = "artifacts" | "caches" | "actions" | "issues" | "kanban" | "settings";
+
+/** URL の # 以降と画面の対応。Issue タブは一覧（#issues・#issues/list）とカンバン（#issues/kanban）に分かれる */
+export const ROUTE_HASH: Record<Route, string> = {
+  artifacts: "artifacts",
+  caches: "caches",
+  actions: "actions",
+  issues: "issues",
+  kanban: "issues/kanban",
+  settings: "settings",
+};
+
+export function routeOf(hash: string): Route {
+  const h = hash.replace(/^#/, "");
+  if (h === "issues/list") return "issues";
+  const found = (Object.keys(ROUTE_HASH) as Route[]).find((r) => ROUTE_HASH[r] === h);
+  return found ?? "artifacts";
+}
 
 /** 各タブの件数。0 のときは出さない（アーティファクトだけは 0 でも出す） */
 export interface TabCounts {
@@ -16,6 +33,8 @@ export interface TabCounts {
   issues: Accessor<number>;
 }
 
+const PROGRESS_LABEL = { repos: "loading.progress", owners: "loading.issues", projects: "loading.projects" } as const;
+
 export function Header(props: {
   route: Route;
   ws: WorkspaceState;
@@ -23,7 +42,7 @@ export function Header(props: {
   counts: TabCounts;
   /** 今のタブの読み込みの進み具合 */
   progress: { done: number; total: number } | null;
-  progressKind: "repos" | "owners";
+  progressKind: "repos" | "owners" | "projects";
   onRefresh: () => void;
   /** アーティファクトタブの、選択中の容量と保存量 */
   meter: { selected: number; total: number } | null;
@@ -37,18 +56,43 @@ export function Header(props: {
     const p = props.progress;
     if (!p) return null;
     return {
-      label: props.progressKind === "owners" ? t("loading.issues", { done: p.done, total: p.total }) : t("loading.progress", { done: p.done, total: p.total }),
+      label: t(PROGRESS_LABEL[props.progressKind], { done: p.done, total: p.total }),
       ratio: p.total === 0 ? 1 : p.done / p.total,
     };
   };
 
-  const tab = (route: Exclude<Route, "settings">, label: string, count: Accessor<number>, showZero = false) => (
-    <a class="tab" href={`#${route}`} aria-current={props.route === route ? "page" : undefined}>
+  const tab = (route: Exclude<Route, "settings" | "kanban">, label: string, count: Accessor<number>, showZero = false, current = props.route === route) => (
+    <a class="tab" href={`#${ROUTE_HASH[route]}`} aria-current={current ? "page" : undefined}>
       {label}
       <Show when={props.connected && (showZero || count() > 0)}>
         <span class="tab__count">{i18n.number(count())}</span>
       </Show>
     </a>
+  );
+
+  // Issue タブ: マウスを合わせるかフォーカスすると、文字の下に「一覧」と「カンバン」を出す。
+  // タブの並びは狭い幅で横にスクロールするため、メニューは position: fixed でタブの真下に置く
+  const [menuAt, setMenuAt] = createSignal<{ left: number; top: number }>({ left: 0, top: 0 });
+  const placeMenu = (e: { currentTarget: HTMLElement }) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    setMenuAt({ left: r.left, top: r.bottom });
+  };
+  const issuesTab = () => (
+    <div class="tab-menu" onPointerEnter={placeMenu} onFocusIn={placeMenu}>
+      {tab("issues", t("tab.issues"), props.counts.issues, false, props.route === "issues" || props.route === "kanban")}
+      <ul class="tab-menu__list" style={{ left: `${menuAt().left}px`, top: `${menuAt().top}px` }} aria-label={t("tab.issues")}>
+        <li>
+          <a href="#issues/list" aria-current={props.route === "issues" ? "page" : undefined}>
+            {t("tab.issues.list")}
+          </a>
+        </li>
+        <li>
+          <a href={`#${ROUTE_HASH.kanban}`} aria-current={props.route === "kanban" ? "page" : undefined}>
+            {t("tab.issues.kanban")}
+          </a>
+        </li>
+      </ul>
+    </div>
   );
 
   return (
@@ -62,7 +106,7 @@ export function Header(props: {
           {tab("artifacts", t("tab.artifacts"), props.counts.artifacts, true)}
           {tab("caches", t("tab.caches"), props.counts.caches)}
           {tab("actions", t("tab.actions"), props.counts.actions)}
-          {tab("issues", t("tab.issues"), props.counts.issues)}
+          {issuesTab()}
         </nav>
         <div class="band__spacer" />
         <Show when={props.meter}>

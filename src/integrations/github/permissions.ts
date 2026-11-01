@@ -14,7 +14,9 @@ export type GitHubOperation =
   | "caches.list"
   | "caches.delete"
   | "runs.list"
-  | "runs.delete";
+  | "runs.delete"
+  | "projects.list"
+  | "projects.move";
 
 interface Requirement {
   /** Fine-grained PAT の権限（"名前=read|write"）。すべて必要 */
@@ -36,6 +38,9 @@ const REQUIREMENTS: Record<GitHubOperation, Requirement> = {
   "caches.delete": { fineGrained: ["actions=write"], classic: ["repo"] },
   "runs.list": { fineGrained: ["actions=read"], classic: ["repo"] },
   "runs.delete": { fineGrained: ["actions=write"], classic: ["repo"] },
+  // Fine-grained PAT の Projects 権限は Organization の権限
+  "projects.list": { fineGrained: ["organization_projects=read"], classic: ["read:project"] },
+  "projects.move": { fineGrained: ["organization_projects=write"], classic: ["project"] },
 };
 
 export interface PermissionHint {

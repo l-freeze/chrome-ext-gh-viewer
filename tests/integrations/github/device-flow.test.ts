@@ -54,7 +54,7 @@ describe("DeviceFlow.requestCode", () => {
     expect(call.url.toString()).toBe("https://github.com/login/device/code");
     expect(call.method).toBe("POST");
     expect(call.headers.get("accept")).toBe("application/json");
-    expect(Object.fromEntries(new URLSearchParams(call.body!))).toEqual({ client_id: "Iv1.test", scope: "repo read:org" });
+    expect(Object.fromEntries(new URLSearchParams(call.body!))).toEqual({ client_id: "Iv1.test", scope: "repo read:org project" });
   });
 
   it("Device Flow が無効な App なら disabled", async () => {

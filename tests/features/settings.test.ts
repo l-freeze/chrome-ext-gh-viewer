@@ -32,8 +32,8 @@ describe("認証情報のルール", () => {
   });
 
   it("不足スコープは上位スコープを考慮し、トークンは伏せて見せる", () => {
-    expect(missingScopes({ scopes: ["repo", "admin:org"] })).toEqual([]);
-    expect(missingScopes({ scopes: ["public_repo"] })).toEqual(["repo", "read:org"]);
+    expect(missingScopes({ scopes: ["repo", "admin:org", "project"] })).toEqual([]);
+    expect(missingScopes({ scopes: ["public_repo"] })).toEqual(["repo", "read:org", "project"]);
     expect(missingScopes({ scopes: null })).toEqual([]);
     expect(maskToken("ghp_abcdefgh1234")).toBe("ghp_…1234");
     expect(maskToken("github_pat_11AAAA_zzzz9876")).toBe("github_pat_…9876");

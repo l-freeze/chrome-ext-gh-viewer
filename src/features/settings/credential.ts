@@ -31,8 +31,8 @@ export interface DeviceCode {
   interval: number;
 }
 
-/** アーティファクトの削除（private リポジトリ含む）と Org 一覧に必要なスコープ */
-export const REQUIRED_SCOPES = ["repo", "read:org"] as const;
+/** アーティファクトの削除（private リポジトリ含む）、Org 一覧、プロジェクトの項目の移動に必要なスコープ */
+export const REQUIRED_SCOPES = ["repo", "read:org", "project"] as const;
 
 /** 上位のスコープが下位のスコープを含む関係 */
 const IMPLIED_BY: Record<string, string[]> = {

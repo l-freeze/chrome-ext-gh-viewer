@@ -11,20 +11,17 @@ import { createArtifactsState } from "../screens/artifacts/state";
 import { CachesScreen } from "../screens/caches/CachesScreen";
 import { createCachesState } from "../screens/caches/state";
 import { IssuesScreen } from "../screens/issues/IssuesScreen";
+import { KanbanScreen } from "../screens/kanban/KanbanScreen";
+import { createKanbanState } from "../screens/kanban/state";
 import { createIssuesState } from "../screens/issues/state";
 import { SettingsScreen } from "../screens/settings/SettingsScreen";
 import { createSettingsState } from "../screens/settings/state";
 import "./app.css";
 import { UiContext, type UiDeps } from "./context";
-import { Header, type Route } from "./Header";
+import { Header, routeOf, type Route } from "./Header";
 import { createWorkspaceState } from "./workspace";
 
-const ROUTES: readonly Route[] = ["artifacts", "caches", "actions", "issues", "settings"];
-
-function currentRoute(): Route {
-  const hash = location.hash.replace(/^#/, "");
-  return (ROUTES as readonly string[]).includes(hash) ? (hash as Route) : "artifacts";
-}
+const currentRoute = (): Route => routeOf(location.hash);
 
 export function App(props: { deps: UiDeps }) {
   const deps = props.deps;
@@ -42,6 +39,7 @@ export function App(props: { deps: UiDeps }) {
   const dispatch = createDispatchState(deps, (repo) => workflows.reload(repo));
   const cleanup = createRunCleanupState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
+  const kanban = createKanbanState(deps, ws, () => route() === "kanban");
   const connected = () => settings.active().length > 0;
 
   const current = () => {
@@ -52,6 +50,8 @@ export function App(props: { deps: UiDeps }) {
         return { progress: workflows.results.progress(), refresh: workflows.results.refresh };
       case "issues":
         return { progress: issues.progress(), refresh: issues.refresh };
+      case "kanban":
+        return { progress: kanban.progress(), refresh: kanban.refresh };
       default:
         return { progress: artifacts.results.progress(), refresh: artifacts.results.refresh };
     }
@@ -70,7 +70,7 @@ export function App(props: { deps: UiDeps }) {
           issues: () => issues.issues().length,
         }}
         progress={current().progress}
-        progressKind={route() === "issues" ? "owners" : "repos"}
+        progressKind={route() === "issues" ? "owners" : route() === "kanban" ? "projects" : "repos"}
         onRefresh={() => current().refresh()}
         meter={
           route() === "artifacts" && artifacts.summary().liveBytes > 0
@@ -111,6 +111,9 @@ export function App(props: { deps: UiDeps }) {
               <Switch>
                 <Match when={route() === "issues"}>
                   <IssuesScreen state={issues} />
+                </Match>
+                <Match when={route() === "kanban"}>
+                  <KanbanScreen state={kanban} />
                 </Match>
                 <Match when={route() === "actions"}>
                   <ActionsScreen

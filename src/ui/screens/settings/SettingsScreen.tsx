@@ -9,7 +9,7 @@ import "./settings.css";
 import { useUi } from "../../app/context";
 
 const CLASSIC_TOKEN_URL =
-  "https://github.com/settings/tokens/new?scopes=repo,read:org&description=Artifact%20%26%20Issue%20Manager";
+  "https://github.com/settings/tokens/new?scopes=repo,read:org,project&description=Artifact%20%26%20Issue%20Manager";
 const FINE_GRAINED_TOKEN_URL = "https://github.com/settings/personal-access-tokens/new";
 const AUTHORIZED_APPS_URL = "https://github.com/settings/applications";
 
