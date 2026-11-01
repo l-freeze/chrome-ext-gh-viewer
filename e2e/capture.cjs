@@ -157,6 +157,29 @@ async function connected(page, id, opts) {
     await page.getByRole("radio", { name: "All" }).click();
     await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
     await shot(page, "Issues", "25-issues-all.png", "Issue: すべて");
+
+    // ---- カンバン ----
+    await page.getByRole("link", { name: /^Issues/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Kanban" }).waitFor();
+    await shot(page, "Kanban", "26-issues-menu.png", "Issue タブにマウスを合わせたときのメニュー");
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Kanban" }).click();
+    await page.mouse.move(700, 600);
+    await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".board__message"));
+    await shot(page, "Kanban", "27-kanban.png", "カンバン（プロジェクトごと、Issue とドラフト）", { fullPage: true });
+    await page.getByRole("button", { name: "Pull requests", exact: true }).click();
+    await page.getByRole("button", { name: /Mobile releases/ }).click();
+    await shot(page, "Kanban", "28-kanban-pr-collapsed.png", "PR も表示し、Mobile releases を折りたたんだところ", { fullPage: true });
+    await page.getByRole("button", { name: /Mobile releases/ }).click();
+    await page.getByRole("button", { name: "Pull requests", exact: true }).click();
+    const card = page.locator(".card", { hasText: "Billing page crashes" });
+    const box = await card.boundingBox();
+    const target = await page.locator(".board", { hasText: "Platform roadmap" }).getByRole("group", { name: "In progress", exact: true }).boundingBox();
+    await page.mouse.move(box.x + 40, box.y + 20);
+    await page.mouse.down();
+    await page.mouse.move(target.x + 60, target.y + 20, { steps: 8 });
+    await shot(page, "Kanban", "29-kanban-dragging.png", "ドラッグ中（落とせる列を強調）");
+    await page.mouse.up();
     await context.close();
   }
 
@@ -172,6 +195,10 @@ async function connected(page, id, opts) {
     await page.getByRole("link", { name: /^Issues/ }).click();
     await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
     await shot(page, "Dark", "32-dark-issues.png", "ダーク: Issue");
+    await page.goto(url(id, "#issues/kanban"));
+    await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".board__message"));
+    await shot(page, "Dark", "34-dark-kanban.png", "ダーク: カンバン");
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "Dark", "33-dark-settings.png", "ダーク: 設定");
@@ -193,6 +220,10 @@ async function connected(page, id, opts) {
     await page.getByRole("link", { name: /^Issue/ }).click();
     await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
     await shot(page, "日本語", "43-ja-issues.png", "日本語: Issue");
+    await page.goto(url(id, "#issues/kanban"));
+    await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".board__message"));
+    await shot(page, "日本語", "45-ja-kanban.png", "日本語: カンバン");
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "日本語", "44-ja-settings.png", "日本語: 設定");
@@ -207,6 +238,15 @@ async function connected(page, id, opts) {
     await page.getByRole("link", { name: /^Issues/ }).click();
     await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
     await shot(page, "狭い画面（幅 420px）", "51-narrow-issues.png", "幅 420px: Issue");
+    await page.getByRole("link", { name: /^Issues/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Kanban" }).waitFor();
+    await shot(page, "狭い画面（幅 420px）", "53-narrow-issues-menu.png", "幅 420px: Issue のメニュー（タブの行が横にスクロールしても切れない）");
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Kanban" }).click();
+    await page.mouse.move(200, 800);
+    await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".board__message"));
+    await shot(page, "狭い画面（幅 420px）", "54-narrow-kanban.png", "幅 420px: カンバン（列は枠の中で横にスクロール）");
+    console.log("narrow kanban horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "狭い画面（幅 420px）", "52-narrow-settings.png", "幅 420px: 設定");

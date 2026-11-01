@@ -176,4 +176,48 @@ addOldRuns("acme-labs/web-console", ci, 60, 4);
 addOldRuns("acme-labs/web-console", deploy, 12, 3);
 addOldRuns("acme-labs/data-pipeline", workflowsByRepo["acme-labs/data-pipeline"][0], 20, 5);
 
-module.exports = { viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml, cachesByRepo, oldRunsByRepo };
+// Projects: 所有者ごとのプロジェクト、プロジェクトごとの単一選択のフィールドと項目。
+// 項目の status は選択肢の ID（null は未設定）。PATCH で書き換わる
+const option = (id, name, color) => ({ id, name: { raw: name, html: name }, color, description: { raw: "", html: "" } });
+const project = (number, title, state = "open") => ({
+  id: 7000 + number, node_id: `PVT_${number}`, number, title, short_description: null, public: false,
+  state, closed_at: state === "closed" ? iso(5) : null, created_at: iso(200), updated_at: iso(1),
+});
+const projectsByOwner = {
+  "acme-labs": [project(1, "Platform roadmap"), project(2, "Design system 2024", "closed"), project(3, "Mobile releases")],
+  "octo-dev": [project(4, "Side projects")],
+};
+const statusFieldByProject = {
+  "acme-labs/1": { id: 301, name: "Status", data_type: "single_select", options: [option("todo", "Todo", "GRAY"), option("doing", "In progress", "YELLOW"), option("done", "Done", "GREEN")] },
+  "acme-labs/3": { id: 303, name: "Status", data_type: "single_select", options: [option("backlog", "Backlog", "GRAY"), option("ready", "Ready", "BLUE"), option("shipped", "Shipped", "PURPLE")] },
+  "octo-dev/4": { id: 304, name: "Status", data_type: "single_select", options: [option("todo4", "Todo", "GRAY"), option("done4", "Done", "GREEN")] },
+};
+const issueContent = (owner, number) => {
+  const i = issuesByOwner[owner].find((x) => x.number === number);
+  return { ...i };
+};
+let itemId = 9000;
+const item = (type, content, status, extra = {}) => ({
+  id: itemId++, node_id: `PVTI_${itemId}`, content_type: type, content, status,
+  created_at: iso(20), updated_at: iso(1), archived_at: null, ...extra,
+});
+const projectItems = {
+  "acme-labs/1": [
+    item("Issue", issueContent("acme-labs", 412), "todo"),
+    item("Issue", issueContent("acme-labs", 77), "doing"),
+    item("Issue", issueContent("acme-labs", 398), "todo"),
+    item("PullRequest", {
+      id: 8801, number: 420, title: "Show an empty state on the invoice list", state: "closed", merged_at: iso(1),
+      html_url: "https://github.com/acme-labs/web-console/pull/420", labels: [], assignees: [viewer],
+    }, "done"),
+    item("DraftIssue", { id: 8802, title: "Plan the Q1 load test", body: "" }, null),
+    item("Issue", issueContent("acme-labs", 1188), "done", { archived_at: iso(3) }),
+  ],
+  "acme-labs/3": [item("Issue", issueContent("acme-labs", 1203), "backlog")],
+  "octo-dev/4": [item("Issue", issueContent("octo-dev", 14), "todo4"), item("Issue", issueContent("octo-dev", 3), "done4")],
+};
+
+module.exports = {
+  viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml, cachesByRepo, oldRunsByRepo,
+  projectsByOwner, statusFieldByProject, projectItems,
+};

@@ -25,7 +25,7 @@ const step = async (name, fn) => {
 
 (async () => {
   // ---- 英語・ライト ---------------------------------------------------------
-  const { context, page, id, log, errors, dispatches, deletes } = await launch();
+  const { context, page, id, log, errors, dispatches, deletes, control } = await launch();
 
   await step("未接続ならオンボーディングを表示", async () => {
     await page.goto(`chrome-extension://${id}/manager.html`);
@@ -114,6 +114,93 @@ const step = async (name, fn) => {
     await page.getByPlaceholder(/Title, label/).fill("");
     await page.getByRole("radio", { name: "Closed" }).click();
     await page.getByRole("link", { name: "Dark mode contrast on the settings screen" }).waitFor();
+  });
+
+  await step("Issue タブのメニューから、カンバンへ移る", async () => {
+    await page.getByRole("link", { name: /^Issues/ }).hover();
+    const menu = page.locator(".tab-menu__list");
+    await menu.getByRole("link", { name: "Kanban" }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "06b-issues-menu.png") });
+    await menu.getByRole("link", { name: "Kanban" }).click();
+    assert.match(page.url(), /#issues\/kanban$/);
+    await page.getByRole("button", { name: /Platform roadmap/ }).waitFor();
+    await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+  });
+
+  const kanbanBoard = (title) => page.locator(".board", { has: page.getByRole("button", { name: new RegExp(title) }) });
+  const kanbanColumn = (board, name) => kanbanBoard(board).getByRole("group", { name, exact: true });
+  const itemRequests = () => log.filter((l) => /^GET \/(orgs|users)\/[^/]+\/projectsV2\/\d+\/items/.test(l));
+
+  await step("カンバン: プロジェクトごとに Status の列で並べ、閉じたプロジェクトとアーカイブ済みの項目は出さない", async () => {
+    assert.equal(await page.locator(".board").count(), 3);
+    assert.equal(await page.getByRole("button", { name: /Design system 2024/ }).count(), 0);
+    await page.getByText("Projects of 1 owner could not be loaded").waitFor();
+    assert.equal(await kanbanColumn("Platform roadmap", "Todo").locator(".card").count(), 2);
+    assert.equal(await kanbanColumn("Platform roadmap", "No Status").locator(".card").count(), 1);
+    // 既定では PR を出さない
+    assert.equal(await page.getByText("Show an empty state on the invoice list").count(), 0);
+    assert.equal(await page.getByText("Dark mode contrast on the settings screen").count(), 0);
+    // フィールドの値は Status だけを求める
+    assert.ok(log.includes("GET /orgs/acme-labs/projectsV2/1/items?per_page=100&fields=301"));
+    await page.screenshot({ path: path.join(OUT, "06c-kanban.png") });
+  });
+
+  await step("カンバン: PR の表示を切り替えても取得し直さない", async () => {
+    const before = log.length;
+    await page.getByRole("button", { name: "Pull requests", exact: true }).click();
+    await page.getByText("Show an empty state on the invoice list").waitFor();
+    assert.equal(await kanbanColumn("Platform roadmap", "Done").locator(".card").count(), 1);
+    await page.getByRole("button", { name: "Pull requests", exact: true }).click();
+    assert.equal(await page.getByText("Show an empty state on the invoice list").count(), 0);
+    assert.deepEqual(log.slice(before), []);
+  });
+
+  await step("カンバン: ドラッグ＆ドロップとキーボードで Status を変える", async () => {
+    const card = page.locator(".card", { hasText: "Billing page crashes" });
+    // Playwright はマウスを押した後でドロップ先へスクロールするため、スクロールの要らない列の見出しへ落とす
+    await card.dragTo(kanbanColumn("Platform roadmap", "In progress"), { targetPosition: { x: 100, y: 12 } });
+    await kanbanColumn("Platform roadmap", "In progress").locator(".card", { hasText: "Billing page crashes" }).waitFor();
+    await page.waitForFunction(() => !document.querySelector(".card--moving"));
+    const id412 = control.projectItems["acme-labs/1"][0].id;
+    assert.deepEqual(control.patches, [{ project: "acme-labs/1", item: id412, body: { fields: [{ id: 301, value: "doing" }] } }]);
+    await page.locator(".card", { hasText: "Billing page crashes" }).focus();
+    await page.keyboard.press("ArrowRight");
+    await kanbanColumn("Platform roadmap", "Done").locator(".card", { hasText: "Billing page crashes" }).waitFor();
+    assert.equal(control.patches.at(-1).body.fields[0].value, "done");
+    // 動かしたカードにフォーカスが残る
+    assert.equal(await page.evaluate(() => document.activeElement?.textContent?.includes("Billing page crashes")), true);
+  });
+
+  await step("カンバン: 動かせなかったら元の列に戻し、必要な権限を示す", async () => {
+    control.failMoves = true;
+    await page.locator(".card", { hasText: "Null partitions" }).dragTo(kanbanColumn("Platform roadmap", "Done"), { targetPosition: { x: 100, y: 12 } });
+    await page.getByText(/Could not move “Null partitions break the nightly parquet export”/).waitFor();
+    await page.locator(".notice--error").getByText("Organization projects").waitFor();
+    await kanbanColumn("Platform roadmap", "In progress").locator(".card", { hasText: "Null partitions" }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "06d-kanban-move-failed.png") });
+    control.failMoves = false;
+    await page.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("カンバン: 折りたたんだプロジェクトは覚えておき、開くまで項目を取得しない", async () => {
+    await page.getByRole("button", { name: /Mobile releases/ }).click();
+    assert.equal(await page.getByRole("button", { name: /Mobile releases/ }).getAttribute("aria-expanded"), "false");
+    await page.reload();
+    await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+    assert.equal(await page.getByRole("button", { name: /Mobile releases/ }).getAttribute("aria-expanded"), "false");
+    const mobile = () => itemRequests().filter((l) => l.includes("/acme-labs/projectsV2/3/")).length;
+    const before = mobile();
+    await page.waitForTimeout(300);
+    assert.equal(mobile(), before);
+    await page.getByRole("button", { name: /Mobile releases/ }).click();
+    await page.getByRole("link", { name: "Upgrade to the new push notification SDK" }).waitFor();
+    assert.equal(mobile(), before + 1);
+  });
+
+  await step("Issue タブを押すと一覧に戻る", async () => {
+    await page.getByRole("link", { name: /^Issues/ }).click();
+    await page.locator(".group-row").first().waitFor();
+    assert.match(page.url(), /#issues$/);
   });
 
   await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {
