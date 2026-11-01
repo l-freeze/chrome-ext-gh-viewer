@@ -13,6 +13,7 @@ import type {
   RepoRef,
   Repository,
   UserRef,
+  ActionsCache,
   Workflow,
   WorkflowRun,
   WorkflowRunRef,
@@ -254,6 +255,8 @@ export function decodeRun(v: unknown, repo: RepoRef, path = "run"): WorkflowRun 
     id: num(o, "id", path),
     workflowId: num(o, "workflow_id", path),
     repo,
+    name: optStr(o, "name", path),
+    displayTitle: optStr(o, "display_title", path),
     runNumber: num(o, "run_number", path),
     status: optStr(o, "status", path),
     conclusion: optStr(o, "conclusion", path),
@@ -279,4 +282,23 @@ export function decodeBranchNames(v: unknown): string[] {
 export function decodeEnvironmentNames(v: unknown): string[] {
   const o = obj(v, "environments");
   return decodeArrayOf(o["environments"], "environments.environments", (x, p) => str(obj(x, p), "name", p));
+}
+
+export function decodeCache(v: unknown, repo: RepoRef, path = "cache"): ActionsCache {
+  const o = obj(v, path);
+  return {
+    id: num(o, "id", path),
+    repo,
+    ref: str(o, "ref", path),
+    key: str(o, "key", path),
+    version: optStr(o, "version", path),
+    sizeInBytes: num(o, "size_in_bytes", path),
+    lastAccessedAt: optStr(o, "last_accessed_at", path),
+    createdAt: optStr(o, "created_at", path),
+  };
+}
+
+export function decodeCachePage(v: unknown, repo: RepoRef): ActionsCache[] {
+  const o = obj(v, "caches");
+  return decodeArrayOf(o["actions_caches"], "caches.actions_caches", (x, p) => decodeCache(x, repo, p));
 }

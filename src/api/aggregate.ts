@@ -80,6 +80,68 @@ export async function deleteArtifacts(
 }
 
 // ---------------------------------------------------------------------------
+// 汎用: リポジトリごとの取得と、まとめての削除
+
+export type RepoItemsResult<T> =
+  | { repo: Repository; ok: true; items: T[]; truncated: boolean }
+  | { repo: Repository; ok: false; error: GitHubApiError };
+
+export interface ForEachOptions<R> {
+  concurrency?: number;
+  signal?: AbortSignal;
+  onProgress?: (progress: Progress, result: R) => void;
+}
+
+/** リポジトリごとに fetch を呼び、結果を集める。失敗したリポジトリはエラーとして返し、ほかは続ける */
+export async function collectForRepos<T>(
+  repos: readonly Repository[],
+  fetch: (repo: Repository, signal: AbortSignal | undefined) => Promise<{ items: T[]; truncated?: boolean }>,
+  options: ForEachOptions<RepoItemsResult<T>> = {},
+): Promise<RepoItemsResult<T>[]> {
+  let done = 0;
+  return mapWithConcurrency(repos, options.concurrency ?? 4, async (repo) => {
+    let result: RepoItemsResult<T>;
+    try {
+      const { items, truncated = false } = await fetch(repo, options.signal);
+      result = { repo, ok: true, items, truncated };
+    } catch (e) {
+      const error = toApiError(e);
+      if (error.kind === "aborted") throw error;
+      result = { repo, ok: false, error };
+    }
+    done++;
+    options.onProgress?.({ done, total: repos.length }, result);
+    return result;
+  });
+}
+
+export type ItemResult<T> = { item: T; ok: true } | { item: T; ok: false; error: GitHubApiError };
+
+/** 1 件ずつ削除する。すでに消えている（404）ものは目的を果たしているので成功扱い。中断されたら止める */
+export async function deleteEach<T>(
+  items: readonly T[],
+  remove: (item: T, signal: AbortSignal | undefined) => Promise<void>,
+  options: ForEachOptions<ItemResult<T>> = {},
+): Promise<ItemResult<T>[]> {
+  let done = 0;
+  return mapWithConcurrency(items, options.concurrency ?? 2, async (item) => {
+    let result: ItemResult<T>;
+    try {
+      if (options.signal?.aborted) throw new GitHubApiError({ kind: "aborted", message: "Aborted" });
+      await remove(item, options.signal);
+      result = { item, ok: true };
+    } catch (e) {
+      const error = toApiError(e);
+      if (error.kind === "aborted") throw error;
+      result = error.kind === "not_found" ? { item, ok: true } : { item, ok: false, error };
+    }
+    done++;
+    options.onProgress?.({ done, total: items.length }, result);
+    return result;
+  });
+}
+
+// ---------------------------------------------------------------------------
 // ワークフロー
 
 export interface WorkflowWithRun {

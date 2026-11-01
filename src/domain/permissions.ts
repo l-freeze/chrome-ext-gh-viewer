@@ -10,7 +10,11 @@ export type Operation =
   | "workflows.list"
   | "workflow.read"
   | "workflow.dispatch"
-  | "issues.search";
+  | "issues.search"
+  | "caches.list"
+  | "caches.delete"
+  | "runs.list"
+  | "runs.delete";
 
 interface Requirement {
   /** Fine-grained PAT の権限（"名前=read|write"）。すべて必要 */
@@ -28,6 +32,10 @@ const REQUIREMENTS: Record<Operation, Requirement> = {
   "workflow.read": { fineGrained: ["contents=read"], classic: ["repo"] },
   "workflow.dispatch": { fineGrained: ["actions=write"], classic: ["repo"] },
   "issues.search": { fineGrained: ["issues=read"], classic: ["repo"] },
+  "caches.list": { fineGrained: ["actions=read"], classic: ["repo"] },
+  "caches.delete": { fineGrained: ["actions=write"], classic: ["repo"] },
+  "runs.list": { fineGrained: ["actions=read"], classic: ["repo"] },
+  "runs.delete": { fineGrained: ["actions=write"], classic: ["repo"] },
 };
 
 export interface PermissionHint {

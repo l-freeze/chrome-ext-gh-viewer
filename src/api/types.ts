@@ -162,10 +162,26 @@ export interface Workflow {
   htmlUrl: string;
 }
 
+export interface ActionsCache {
+  id: number;
+  repo: RepoRef;
+  /** refs/heads/main、refs/pull/12/merge など */
+  ref: string;
+  key: string;
+  version: string | null;
+  sizeInBytes: number;
+  lastAccessedAt: string | null;
+  createdAt: string | null;
+}
+
 export interface WorkflowRun {
   id: number;
   workflowId: number;
   repo: RepoRef;
+  /** ワークフロー名 */
+  name: string | null;
+  /** 実行の表示名（コミットメッセージや PR のタイトル） */
+  displayTitle: string | null;
   runNumber: number;
   /** queued / in_progress / completed など */
   status: string | null;

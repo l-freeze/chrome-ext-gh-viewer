@@ -140,4 +140,40 @@ const workflowYaml = {
   ".github/workflows/release.yml": "on: workflow_dispatch\njobs: {}\n",
 };
 
-module.exports = { viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml };
+let cacheId = 3000;
+const cache = (ref, key, sizeMB, usedDaysAgo) => ({
+  id: cacheId++, ref, key, version: "v1", size_in_bytes: Math.round(sizeMB * MB),
+  last_accessed_at: iso(usedDaysAgo), created_at: iso(usedDaysAgo + 3),
+});
+const cachesByRepo = {
+  "acme-labs/web-console": [
+    cache("refs/heads/main", "Linux-node-modules-8c1f", 412.5, 0),
+    cache("refs/pull/412/merge", "Linux-node-modules-2a9e", 398.1, 1),
+    cache("refs/pull/398/merge", "Linux-node-modules-77d0", 401.7, 5),
+    cache("refs/heads/feat/billing-page", "Linux-playwright-browsers", 512.0, 4),
+  ],
+  "acme-labs/data-pipeline": [
+    cache("refs/heads/main", "pip-3.12-requirements-0be1", 88.4, 0),
+    cache("refs/pull/77/merge", "pip-3.12-requirements-91fa", 87.9, 2),
+  ],
+  "octo-dev/tile-game": [cache("refs/heads/main", "cargo-registry-e41b", 233.0, 6)],
+};
+
+// 実行履歴の整理で検索される、古い実行（作成から 35〜120 日）
+let oldRunId = 50000;
+const oldRunsByRepo = {};
+const addOldRuns = (repoKey, wf, count, everyNth) => {
+  const list = (oldRunsByRepo[repoKey] ??= []);
+  for (let i = 0; i < count; i++) {
+    const failed = i % everyNth === 0;
+    list.push({
+      ...run(repoKey, wf, 35 + i, "completed", failed ? "failure" : "success"),
+      id: oldRunId++, name: wf.name, display_title: `Old run ${i}`,
+    });
+  }
+};
+addOldRuns("acme-labs/web-console", ci, 60, 4);
+addOldRuns("acme-labs/web-console", deploy, 12, 3);
+addOldRuns("acme-labs/data-pipeline", workflowsByRepo["acme-labs/data-pipeline"][0], 20, 5);
+
+module.exports = { viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml, cachesByRepo, oldRunsByRepo };

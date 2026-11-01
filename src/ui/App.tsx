@@ -3,12 +3,15 @@ import { Header, type Route } from "./Header";
 import { createArtifactsState } from "./state/artifacts";
 import { createAuthState } from "./state/auth";
 import { DepsContext, type AppDeps } from "./state/context";
+import { createCachesState } from "./state/caches";
 import { createDispatchState } from "./state/dispatch";
+import { createRunCleanupState } from "./state/runCleanup";
 import { createIssuesState } from "./state/issues";
 import { createWorkflowsState } from "./state/workflows";
 import { createWorkspaceState } from "./state/workspace";
 import { ActionsView } from "./views/ActionsView";
 import { ArtifactsView } from "./views/ArtifactsView";
+import { CachesView } from "./views/CachesView";
 import { DispatchDialog } from "./views/DispatchDialog";
 import { IssuesView } from "./views/IssuesView";
 import { SettingsView } from "./views/SettingsView";
@@ -16,7 +19,7 @@ import { Failures } from "./components/Failures";
 import { errorText } from "./errors";
 import { GitHubApiError } from "../api/errors";
 
-const ROUTES: readonly Route[] = ["artifacts", "actions", "issues", "settings"];
+const ROUTES: readonly Route[] = ["artifacts", "caches", "actions", "issues", "settings"];
 
 function currentRoute(): Route {
   const hash = location.hash.replace(/^#/, "");
@@ -37,6 +40,8 @@ export function App(props: { deps: AppDeps }) {
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const workflows = createWorkflowsState(deps, ws, () => route() === "actions");
   const dispatch = createDispatchState(ws, (repo) => workflows.refreshRepo(repo));
+  const caches = createCachesState(deps, ws, () => route() === "caches");
+  const runCleanup = createRunCleanupState(deps, ws);
   const connected = () => auth.active().length > 0;
 
   return (
@@ -47,6 +52,7 @@ export function App(props: { deps: AppDeps }) {
         artifacts={artifacts}
         issues={issues}
         workflows={workflows}
+        caches={caches}
         connected={connected()}
       />
       <main class="main">
@@ -88,7 +94,15 @@ export function App(props: { deps: AppDeps }) {
                   <IssuesView state={issues} />
                 </Match>
                 <Match when={route() === "actions"}>
-                  <ActionsView state={workflows} onRun={(target) => void dispatch.open(target)} />
+                  <ActionsView
+                    state={workflows}
+                    cleanup={runCleanup}
+                    repoCount={ws.selectedRepos().length}
+                    onRun={(target) => void dispatch.open(target)}
+                  />
+                </Match>
+                <Match when={route() === "caches"}>
+                  <CachesView state={caches} ws={ws} />
                 </Match>
                 <Match when={true}>
                   <ArtifactsView state={artifacts} ws={ws} />
