@@ -9,6 +9,8 @@ import { createCachesFeature } from "../features/caches/compose";
 import { createGitHubCacheSource } from "../features/caches/gateways/github";
 import { createIssuesFeature } from "../features/issues/compose";
 import { createGitHubIssueSource } from "../features/issues/gateways/github";
+import { createPreferencesFeature } from "../features/preferences/compose";
+import { createDisplayPreferencesStorage } from "../features/preferences/gateways/storage";
 import { createProjectsFeature } from "../features/projects/compose";
 import { createGitHubProjectSource } from "../features/projects/gateways/github";
 import { createBoardPreferencesStorage } from "../features/projects/gateways/storage";
@@ -55,6 +57,7 @@ export function createManager(env: ManagerEnvironment) {
     caches: createCachesFeature({ source: createGitHubCacheSource((r) => access.forRepo(r)) }),
     actions: createActionsFeature({ source: createGitHubActionsSource((r) => access.forRepo(r)), now }),
     issues: createIssuesFeature({ source: createGitHubIssueSource((login) => access.forOwner(login)) }),
+    preferences: createPreferencesFeature({ repository: createDisplayPreferencesStorage(env.storage) }),
     projects: createProjectsFeature({
       source: createGitHubProjectSource((login) => access.forOwner(login)),
       preferences: createBoardPreferencesStorage(env.storage),

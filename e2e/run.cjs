@@ -371,6 +371,55 @@ const step = async (name, fn) => {
     await context.close();
   }
 
+  // ---- 自動更新 -------------------------------------------------------------------
+  {
+    const { context, page, id, log, control } = await launch();
+    await step("自動更新: List は 1 分ごと、Kanban は 2 分ごとに、表示を消さずに取り直す", async () => {
+      await page.clock.install();
+      await connect(page, id);
+      await page.goto(`chrome-extension://${id}/manager.html#issues`);
+      await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+      assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("aria-checked"), "true");
+      const searches = () => log.filter((l) => l.startsWith("GET /search/issues")).length;
+      const before = searches();
+      const created = { ...control.issues["acme-labs"][0], id: 6001, number: 430, title: "Created on GitHub a moment ago", html_url: "https://github.com/acme-labs/web-console/issues/430" };
+      control.issues["acme-labs"].unshift(created);
+      await page.clock.fastForward("00:59");
+      await page.waitForTimeout(300);
+      assert.equal(searches(), before, "1 分たつまでは取り直さない");
+      await page.clock.fastForward("00:02");
+      await page.getByRole("link", { name: "Created on GitHub a moment ago" }).waitFor();
+      // 選んでいる 3 所有者を 1 回ずつ検索し直す（読めなかった所有者も、権限が直っていれば表示できるように含める）
+      assert.equal(searches(), before + 3);
+
+      await page.getByRole("link", { name: /^Issues/ }).hover();
+      await page.locator(".tab-menu__list").getByRole("link", { name: "Kanban" }).click();
+      await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+      await page.locator(".card", { hasText: "Billing page crashes" }).evaluate((el) => (el.dataset.mark = "kept"));
+      control.projectItems["acme-labs/1"].push({ ...control.projectItems["acme-labs/1"][0], id: 9100, content: created, status: "doing" });
+      await page.clock.fastForward("01:59");
+      await page.waitForTimeout(300);
+      assert.equal(await page.getByText("Created on GitHub a moment ago").count(), 0, "2 分たつまでは取り直さない");
+      await page.clock.fastForward("00:02");
+      await page.locator(".board", { hasText: "Platform roadmap" }).getByRole("group", { name: "In progress", exact: true }).getByText("Created on GitHub a moment ago").waitFor();
+      // 変わっていないカードは作り直さない
+      assert.equal(await page.locator('.card[data-mark="kept"]').count(), 1);
+    });
+
+    await step("自動更新: オフにすると取り直さず、オフのままになる", async () => {
+      await page.getByRole("switch", { name: "Auto refresh" }).click();
+      assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("aria-checked"), "false");
+      const before = log.length;
+      await page.clock.fastForward("05:00");
+      await page.waitForTimeout(300);
+      assert.deepEqual(log.slice(before), []);
+      await page.reload();
+      await page.getByRole("link", { name: "Billing page crashes when the invoice list is empty" }).waitFor();
+      assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("aria-checked"), "false");
+    });
+    await context.close();
+  }
+
   // ---- ダーク ---------------------------------------------------------------
   {
     const { context, page, id } = await launch({ colorScheme: "dark" });

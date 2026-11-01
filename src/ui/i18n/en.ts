@@ -14,6 +14,8 @@ export const en = {
   "action.cancel": "Cancel",
   "action.clear": "Clear",
   "action.close": "Close",
+  "autoRefresh.label": "Auto refresh",
+  "autoRefresh.title": { one: "Refresh every minute while this screen is open", other: "Refresh every {count} minutes while this screen is open" },
   "owners.label": "Owners",
   "owners.personal": "Personal account",
   "owners.organization": "Organization",

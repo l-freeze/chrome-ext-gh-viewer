@@ -19,7 +19,12 @@ import { createSettingsState } from "../screens/settings/state";
 import "./app.css";
 import { UiContext, type UiDeps } from "./context";
 import { Header, routeOf, type Route } from "./Header";
+import { createAutoRefreshSetting, createPolling } from "./auto-refresh";
 import { createWorkspaceState } from "./workspace";
+
+/** 自動更新の間隔。List は Search API（30 回/分）、Kanban は通常の API（5,000 回/時）を使い、Kanban は 1 回の更新で呼ぶ数が多いので長めにする */
+const ISSUES_REFRESH_MINUTES = 1;
+const KANBAN_REFRESH_MINUTES = 2;
 
 const currentRoute = (): Route => routeOf(location.hash);
 
@@ -41,6 +46,19 @@ export function App(props: { deps: UiDeps }) {
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const kanban = createKanbanState(deps, ws, () => route() === "kanban");
   const connected = () => settings.active().length > 0;
+
+  const autoRefresh = createAutoRefreshSetting(deps);
+  createPolling({
+    when: () => autoRefresh.enabled() && connected() && route() === "issues",
+    intervalMs: ISSUES_REFRESH_MINUTES * 60_000,
+    run: issues.poll,
+  });
+  createPolling({
+    when: () => autoRefresh.enabled() && connected() && route() === "kanban",
+    intervalMs: KANBAN_REFRESH_MINUTES * 60_000,
+    run: kanban.poll,
+  });
+  const autoRefreshMinutes = () => (route() === "issues" ? ISSUES_REFRESH_MINUTES : route() === "kanban" ? KANBAN_REFRESH_MINUTES : null);
 
   const current = () => {
     switch (route()) {
@@ -72,6 +90,10 @@ export function App(props: { deps: UiDeps }) {
         progress={current().progress}
         progressKind={route() === "issues" ? "owners" : route() === "kanban" ? "projects" : "repos"}
         onRefresh={() => current().refresh()}
+        autoRefresh={(() => {
+          const minutes = autoRefreshMinutes();
+          return minutes === null ? null : { enabled: autoRefresh.enabled(), minutes, onToggle: autoRefresh.toggle };
+        })()}
         meter={
           route() === "artifacts" && artifacts.summary().liveBytes > 0
             ? { selected: artifacts.selectionSummary().bytes, total: artifacts.summary().liveBytes }

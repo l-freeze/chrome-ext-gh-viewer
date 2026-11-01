@@ -154,7 +154,7 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       const owner = /(?:org|user):(\S+)/.exec(q)[1];
       if (owner === "locked-corp") return json(route, { message: "forbidden" }, 403);
       const state = /is:(open|closed)/.exec(q)?.[1];
-      const items = (fx.issuesByOwner[owner] ?? []).filter((i) => !state || i.state === state);
+      const items = (control.issues[owner] ?? []).filter((i) => !state || i.state === state);
       return json(route, { total_count: items.length, incomplete_results: false, items });
     }
     return json(route, { message: "Not Found" }, 404);
@@ -199,6 +199,7 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     runs: structuredClone(fx.runsByRepo),
     oldRuns: structuredClone(fx.oldRunsByRepo),
     caches: structuredClone(fx.cachesByRepo),
+    issues: structuredClone(fx.issuesByOwner),
     projectItems: structuredClone(fx.projectItems),
     patches: [],
     failMoves: false,

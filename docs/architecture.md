@@ -14,6 +14,7 @@ src/
 │   ├── caches/               Actions のキャッシュ
 │   ├── actions/              ワークフロー一覧・手動実行・実行履歴の整理
 │   ├── issues/               Issue の横断検索（Issue タブの List）
+│   ├── preferences/          画面をまたぐ表示の好み（自動更新のオン・オフ）
 │   └── projects/             Projects のカンバンと、項目の Status の変更（Issue タブの Kanban）
 ├── integrations/github/      GitHub という外部サービスの約束ごと
 ├── infrastructure/           汎用の技術基盤（HTTP 送信、保存先、ダウンロード）
