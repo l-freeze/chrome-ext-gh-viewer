@@ -5,5 +5,5 @@
     "jsxImportSource": "solid-js",
     "types": []
   },
-  "include": ["src", "test", ".wxt/wxt.d.ts", "wxt.config.ts", "vitest.config.ts"]
+  "include": ["src", "test", "tests", ".wxt/wxt.d.ts", "wxt.config.ts", "vitest.config.ts"]
 }
