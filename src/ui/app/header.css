@@ -178,6 +178,56 @@
   height: 100%;
 }
 
+/* 自動更新のオン・オフ */
+.switch {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 32px;
+  padding: 0 4px;
+  border: 0;
+  background: transparent;
+  color: var(--band-muted);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+.switch[aria-checked="true"] {
+  color: var(--band-text);
+}
+.switch__track {
+  position: relative;
+  width: 30px;
+  height: 18px;
+  border-radius: 9px;
+  background: var(--band-2);
+  border: 1px solid var(--band-muted);
+  transition: background 0.15s ease;
+}
+.switch__thumb {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 12px;
+  height: 12px;
+  border-radius: 50%;
+  background: var(--band-muted);
+  transition: transform 0.15s ease;
+}
+.switch[aria-checked="true"] .switch__track {
+  background: var(--meter);
+  border-color: var(--meter);
+}
+.switch[aria-checked="true"] .switch__thumb {
+  transform: translateX(12px);
+  background: var(--band);
+}
+.switch:focus-visible {
+  outline: 2px solid var(--focus);
+  outline-offset: 2px;
+  border-radius: var(--radius);
+}
+
 /* Issue タブの下に出す「一覧」「カンバン」。マウスを合わせたときとキーボードで選んだときに出す */
 .tab-menu {
   display: flex;
@@ -232,7 +282,8 @@
   .tab {
     padding: 0 8px;
   }
-  .meter {
+  .meter,
+  .switch__label {
     display: none;
   }
   .band__row:first-child {

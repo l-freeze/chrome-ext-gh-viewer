@@ -44,6 +44,8 @@ export function Header(props: {
   progress: { done: number; total: number } | null;
   progressKind: "repos" | "owners" | "projects";
   onRefresh: () => void;
+  /** 自動更新に対応した画面でだけ渡す。minutes は取り直す間隔 */
+  autoRefresh: { enabled: boolean; minutes: number; onToggle: () => void } | null;
   /** アーティファクトタブの、選択中の容量と保存量 */
   meter: { selected: number; total: number } | null;
 }) {
@@ -121,6 +123,24 @@ export function Header(props: {
                 <span class="meter__fill" style={{ width: `${Math.min(100, (m().selected / m().total) * 100)}%` }} />
               </span>
             </div>
+          )}
+        </Show>
+        <Show when={props.connected && props.autoRefresh}>
+          {(a) => (
+            <button
+              type="button"
+              class="switch"
+              role="switch"
+              aria-checked={a().enabled}
+              aria-label={t("autoRefresh.label")}
+              onClick={() => a().onToggle()}
+              title={t("autoRefresh.title", { count: a().minutes })}
+            >
+              <span class="switch__track" aria-hidden="true">
+                <span class="switch__thumb" />
+              </span>
+              <span class="switch__label">{t("autoRefresh.label")}</span>
+            </button>
           )}
         </Show>
         <Show when={props.connected && props.route !== "settings"}>

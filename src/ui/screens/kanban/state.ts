@@ -1,13 +1,14 @@
 // カンバンの状態。プロジェクトの一覧は所有者ごと、項目はプロジェクトごとに取得して覚えておく。
 // - 項目は全種類をまとめて取得するので、表示する種類を切り替えても取得し直さない
 // - 折りたたんだプロジェクトの項目は、開くまで取得しない
-// - 取得し直すのは、再読み込みと作業範囲が変わったときだけ
+// - 取得し直すのは、再読み込み・自動更新・作業範囲が変わったとき。自動更新では表示を消さずに、変わったところだけ差し替える
 
 import { batch, createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { withItemStatus, type Board } from "../../../features/projects/board";
 import { projectKey, type ItemKind, type Project } from "../../../features/projects/project";
 import { DEFAULT_BOARD_PREFERENCES, type BoardPreferences, type OwnerProjects } from "../../../features/projects/ports";
 import { settleEach } from "../../../lib/concurrency";
+import { reuseUnchanged, sameValue } from "../../../lib/reuse";
 import type { UiDeps } from "../../app/context";
 import type { WorkspaceState } from "../../app/workspace";
 import { isAborted } from "../../errors";
@@ -20,6 +21,16 @@ export interface MoveFailure {
 }
 
 const BOARD_CONCURRENCY = 4;
+
+/** 取り直した盤面のうち、変わっていない部分は前のオブジェクトを使う（カードを作り直さないため） */
+function refreshed(old: Board, fresh: Board): Board {
+  if (sameValue(old, fresh)) return old;
+  return {
+    project: sameValue(old.project, fresh.project) ? old.project : fresh.project,
+    field: sameValue(old.field, fresh.field) ? old.field : fresh.field,
+    items: reuseUnchanged(old.items, fresh.items, (i) => i.id),
+  };
+}
 
 export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Accessor<boolean>) {
   const ops = deps.manager.projects;
@@ -36,6 +47,9 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
 
   let generation = new AbortController();
   const loadingOwners = new Set<string>();
+  // プロジェクトごとの、最後に項目を動かした順番。自動更新の途中で動かした盤面には、古い結果を当てない
+  let moveCount = 0;
+  const lastMove = new Map<string, number>();
 
   /** 読み込みの進み具合。全部終わったら数え直す */
   async function track<T>(work: Promise<T>): Promise<T> {
@@ -147,6 +161,7 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
     if (!item || item.statusId === statusId || moving().has(movingKey)) return;
 
     const before = item.statusId;
+    lastMove.set(key, ++moveCount);
     batch(() => {
       setBoard(key, { status: "ready", board: withItemStatus(board, itemId, statusId) });
       setMoving((prev) => new Set(prev).add(movingKey));
@@ -171,7 +186,49 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
     }
   }
 
+  /** 自動更新: 取得済みの所有者のプロジェクトと、表示しているプロジェクトの項目を取り直す。読み込み中や移動中は何もしない */
+  async function poll() {
+    if (tasks().total > 0 || moving().size > 0) return;
+    const loaded = ws
+      .selectedOwners()
+      .map((o) => o.owner)
+      .filter((o) => owners().has(o.login.toLowerCase()));
+    if (loaded.length === 0) return;
+    const { signal } = generation;
+    const startedAt = moveCount;
+    try {
+      await ops.listProjects(loaded, {
+        signal,
+        onOwnerDone: (result) => {
+          const key = result.owner.login.toLowerCase();
+          const prev = owners().get(key);
+          if (signal.aborted || !prev || (result.error !== null && prev.error === null) || sameValue(prev, result)) return;
+          setOwners((m) => new Map(m).set(key, { ...result, projects: reuseUnchanged(prev.projects, result.projects, projectKey) }));
+        },
+      });
+      const targets = projects().filter((p) => {
+        const status = boards().get(projectKey(p))?.status;
+        return !collapsed().has(projectKey(p)) && (status === "ready" || status === "error");
+      });
+      await settleEach(targets, (p, s) => ops.loadBoard(p, s), {
+        concurrency: BOARD_CONCURRENCY,
+        signal,
+        onProgress: (_, r) => {
+          const key = projectKey(r.item);
+          const current = boards().get(key);
+          if (signal.aborted || !r.ok || (lastMove.get(key) ?? 0) > startedAt) return;
+          if (current?.status !== "ready") return setBoard(key, { status: "ready", board: r.value });
+          const next = refreshed(current.board, r.value);
+          if (next !== current.board) setBoard(key, { status: "ready", board: next });
+        },
+      });
+    } catch (e) {
+      if (!isAborted(e)) throw e;
+    }
+  }
+
   return {
+    poll,
     projects,
     kinds,
     toggleKind(kind: ItemKind) {

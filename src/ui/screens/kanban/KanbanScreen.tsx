@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createMemo, createSignal, For, Index, Match, Show, Switch } from "solid-js";
 import { adjacentStatus, columnsOf, countVisible, type Board, type Column } from "../../../features/projects/board";
 import { ITEM_KINDS, projectKey, type Project, type ProjectItem } from "../../../features/projects/project";
 import { useUi } from "../../app/context";
@@ -93,6 +93,10 @@ export function KanbanScreen(props: { state: KanbanState }) {
           const bodyId = `board-${projectKey(project).replace(/[^a-z0-9]/gi, "-")}`;
           const entry = () => s.board(project);
           const expanded = () => !s.isCollapsed(project);
+          const readyBoard = () => {
+            const e = entry();
+            return e?.status === "ready" ? e.board : undefined;
+          };
           return (
             <section class="board" classList={{ "board--collapsed": !expanded() }}>
               <header class="board__head">
@@ -109,12 +113,8 @@ export function KanbanScreen(props: { state: KanbanState }) {
                   <Avatar src={project.owner.avatarUrl} login={project.owner.login} size={18} />
                   <span class="muted">{project.owner.login} /</span>
                   <strong>{project.title}</strong>
-                  <Show when={entry()?.status === "ready" && entry()} keyed>
-                    {(e) =>
-                      e.status === "ready" && (
-                        <span class="board__count">{t("kanban.count", { count: countVisible(e.board, s.kinds()) })}</span>
-                      )
-                    }
+                  <Show when={readyBoard()}>
+                    {(b) => <span class="board__count">{t("kanban.count", { count: countVisible(b(), s.kinds()) })}</span>}
                   </Show>
                 </button>
                 <a class="board__link" href={project.htmlUrl} target="_blank" rel="noreferrer" title={t("kanban.openOnGitHub")}>
@@ -138,17 +138,8 @@ export function KanbanScreen(props: { state: KanbanState }) {
                         )
                       }
                     </Match>
-                    <Match when={entry()?.status === "ready" && entry()} keyed>
-                      {(e) =>
-                        e.status === "ready" && (
-                          <BoardColumns
-                            board={e.board}
-                            columns={columnsOf(e.board, s.kinds())}
-                            name={(c) => columnName(e.board, c)}
-                          />
-                        )
-                      }
-                    </Match>
+                    {/* 盤面が差し替わっても列とカードを作り直さない（自動更新や移動の途中でもドラッグやフォーカスが切れない） */}
+                    <Match when={readyBoard()}>{(b) => <BoardColumns board={b()} />}</Match>
                   </Switch>
                 </div>
               </Show>
@@ -163,8 +154,9 @@ export function KanbanScreen(props: { state: KanbanState }) {
     </div>
   );
 
-  function BoardColumns(p: { board: Board; columns: Column[]; name: (c: Column) => string }) {
+  function BoardColumns(p: { board: Board }) {
     const key = () => projectKey(p.board.project);
+    const columns = createMemo(() => columnsOf(p.board, s.kinds()));
     const canMove = () => p.board.field !== null;
     const accepts = () => dragging()?.projectKey === key() && canMove();
 
@@ -174,15 +166,15 @@ export function KanbanScreen(props: { state: KanbanState }) {
           <p class="muted small board__message">{t("kanban.noField")}</p>
         </Show>
         <div class="columns">
-          <For each={p.columns}>
+          <Index each={columns()}>
             {(column) => {
-              const overKey = () => `${key()}|${columnKey(column)}`;
+              const overKey = () => `${key()}|${columnKey(column())}`;
               return (
                 <div
                   class="column"
                   classList={{ "column--over": accepts() && over() === overKey() }}
                   role="group"
-                  aria-label={p.name(column)}
+                  aria-label={columnName(p.board, column())}
                   onDragOver={(e) => {
                     if (!accepts()) return;
                     e.preventDefault();
@@ -197,21 +189,21 @@ export function KanbanScreen(props: { state: KanbanState }) {
                     const d = accepts() ? dragging() : null;
                     endDrag();
                     const item = d ? p.board.items.find((i) => i.id === d.itemId) : undefined;
-                    if (item) moveTo(p.board, item, column.option?.id ?? null);
+                    if (item) moveTo(p.board, item, column().option?.id ?? null);
                   }}
                 >
-                  <div class="column__head" title={column.option?.description ?? undefined}>
-                    <span class="swatch" data-color={column.option?.color ?? "GRAY"} aria-hidden="true" />
-                    <span class="column__name">{p.name(column)}</span>
-                    <span class="column__count">{i18n.number(column.items.length)}</span>
+                  <div class="column__head" title={column().option?.description ?? undefined}>
+                    <span class="swatch" data-color={column().option?.color ?? "GRAY"} aria-hidden="true" />
+                    <span class="column__name">{columnName(p.board, column())}</span>
+                    <span class="column__count">{i18n.number(column().items.length)}</span>
                   </div>
                   <ul class="column__items">
-                    <For each={column.items}>{(item) => <Card board={p.board} item={item} canMove={canMove()} />}</For>
+                    <For each={column().items}>{(item) => <Card board={p.board} item={item} canMove={canMove()} />}</For>
                   </ul>
                 </div>
               );
             }}
-          </For>
+          </Index>
         </div>
       </>
     );

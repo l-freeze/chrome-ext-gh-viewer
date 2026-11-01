@@ -16,6 +16,8 @@ export const ja: Messages = {
   "action.cancel": "キャンセル",
   "action.clear": "選択解除",
   "action.close": "閉じる",
+  "autoRefresh.label": "自動更新",
+  "autoRefresh.title": same("この画面を開いている間、{count} 分ごとに取り直します"),
   "owners.label": "所有者",
   "owners.personal": "個人アカウント",
   "owners.organization": "Organization",

@@ -1,5 +1,5 @@
 // Issue 一覧の状態。表示（検索・絞り込み）だけを扱う。
-// Issue への操作を足すときは、API 層に呼び出しを、ここに結果を一覧へ反映する処理を追加する。
+// Issue への操作を足すときは、features/issues に操作を、ここに結果を一覧へ反映する処理を追加する。
 
 import { batch, createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
 import { filterIssues, groupIssuesByRepo } from "../../../features/issues/issue";
@@ -7,6 +7,7 @@ import type { IssueStateFilter, OwnerIssues as OwnerIssuesResult } from "../../.
 import type { UiDeps } from "../../app/context";
 import type { WorkspaceState } from "../../app/workspace";
 import { isAborted } from "../../errors";
+import { sameValue } from "../../../lib/reuse";
 
 export function createIssuesState(deps: UiDeps, ws: WorkspaceState, active: Accessor<boolean>) {
   const ops = deps.manager.issues;
@@ -70,6 +71,38 @@ export function createIssuesState(deps: UiDeps, ws: WorkspaceState, active: Acce
     }),
   );
 
+  /**
+   * 自動更新: 検索済みの所有者を検索し直し、変わったところだけ差し替える。
+   * 表示は消さない。読み込み中なら何もしない。一時的に失敗した所有者は前の結果を残す
+   */
+  async function poll() {
+    if (abort || !ws.workspace()) return;
+    const state = stateFilter();
+    const owners = ws
+      .selectedOwners()
+      .map((o) => o.owner)
+      .filter((o) => results().has(keyOf(state, o.login)));
+    if (owners.length === 0) return;
+    const controller = new AbortController();
+    abort = controller;
+    try {
+      await ops.search(owners, state, {
+        signal: controller.signal,
+        onOwnerDone: (result) => {
+          if (controller.signal.aborted) return;
+          const key = keyOf(state, result.owner.login);
+          const prev = results().get(key);
+          if (result.error !== null && prev && prev.error === null) return;
+          if (!sameValue(prev, result)) setResults((m) => new Map(m).set(key, result));
+        },
+      });
+    } catch (e) {
+      if (!isAborted(e)) throw e;
+    } finally {
+      if (abort === controller) abort = null;
+    }
+  }
+
   const ownerResults = createMemo(() =>
     ws
       .selectedOwners()
@@ -92,6 +125,7 @@ export function createIssuesState(deps: UiDeps, ws: WorkspaceState, active: Acce
     failures: createMemo(() => ownerResults().filter((r) => r.error !== null)),
     truncatedOwners: createMemo(() => ownerResults().filter((r) => r.truncated).map((r) => r.owner.login)),
     refresh: () => void load(true),
+    poll,
   };
 }
 
