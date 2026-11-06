@@ -6,7 +6,7 @@ import { useUi } from "./context";
 import type { WorkspaceState } from "./workspace";
 import "./header.css";
 
-export type Route = "artifacts" | "caches" | "actions" | "issues" | "kanban" | "settings";
+export type Route = "artifacts" | "caches" | "actions" | "issues" | "kanban" | "secrets" | "settings";
 
 /** URL の # 以降と画面の対応。Issue タブは一覧（#issues・#issues/list）とカンバン（#issues/kanban）に分かれる */
 export const ROUTE_HASH: Record<Route, string> = {
@@ -15,6 +15,7 @@ export const ROUTE_HASH: Record<Route, string> = {
   actions: "actions",
   issues: "issues",
   kanban: "issues/kanban",
+  secrets: "secrets",
   settings: "settings",
 };
 
@@ -31,6 +32,7 @@ export interface TabCounts {
   caches: Accessor<number>;
   actions: Accessor<number>;
   issues: Accessor<number>;
+  secrets: Accessor<number>;
 }
 
 const PROGRESS_LABEL = { repos: "loading.progress", owners: "loading.issues", projects: "loading.projects" } as const;
@@ -109,6 +111,7 @@ export function Header(props: {
           {tab("caches", t("tab.caches"), props.counts.caches)}
           {tab("actions", t("tab.actions"), props.counts.actions)}
           {issuesTab()}
+          {tab("secrets", t("tab.secrets"), props.counts.secrets)}
         </nav>
         <div class="band__spacer" />
         <Show when={props.meter}>

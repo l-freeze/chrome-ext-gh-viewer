@@ -14,6 +14,8 @@ import { IssuesScreen } from "../screens/issues/IssuesScreen";
 import { KanbanScreen } from "../screens/kanban/KanbanScreen";
 import { createKanbanState } from "../screens/kanban/state";
 import { createIssuesState } from "../screens/issues/state";
+import { SecretsScreen } from "../screens/secrets/SecretsScreen";
+import { createSecretsState } from "../screens/secrets/state";
 import { SettingsScreen } from "../screens/settings/SettingsScreen";
 import { createSettingsState } from "../screens/settings/state";
 import "./app.css";
@@ -28,6 +30,8 @@ import { createWorkspaceState } from "./workspace";
  */
 const ISSUES_REFRESH_MS = 60_000;
 const KANBAN_REFRESH_MS = 2 * 60_000;
+/** Secrets と Variables はめったに変わらないので 1 日ごと（すぐに見たいときは再読み込みボタンを使う） */
+const SECRETS_REFRESH_MS = 24 * 60 * 60_000;
 
 const currentRoute = (): Route => routeOf(location.hash);
 
@@ -49,6 +53,7 @@ export function App(props: { deps: UiDeps }) {
   const cleanup = createRunCleanupState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const kanban = createKanbanState(deps, ws, () => route() === "kanban");
+  const secrets = createSecretsState(deps, ws, () => route() === "secrets");
   const connected = () => settings.active().length > 0;
 
   // 画面ごとの自動更新。リポジトリごとに呼ぶ画面は、選んでいるリポジトリの数から間隔を決める
@@ -60,6 +65,7 @@ export function App(props: { deps: UiDeps }) {
     { route: "actions", intervalMs: () => intervalForRequests(2 * repoCount()), run: workflows.results.poll },
     { route: "issues", intervalMs: () => ISSUES_REFRESH_MS, run: issues.poll },
     { route: "kanban", intervalMs: () => KANBAN_REFRESH_MS, run: kanban.poll },
+    { route: "secrets", intervalMs: () => SECRETS_REFRESH_MS, run: secrets.results.poll },
   ];
   for (const plan of refreshPlans) {
     createPolling({ when: () => autoRefresh.enabled() && connected() && route() === plan.route, intervalMs: plan.intervalMs, run: plan.run });
@@ -79,6 +85,8 @@ export function App(props: { deps: UiDeps }) {
         return { progress: issues.progress(), refresh: issues.refresh };
       case "kanban":
         return { progress: kanban.progress(), refresh: kanban.refresh };
+      case "secrets":
+        return { progress: secrets.results.progress(), refresh: secrets.results.refresh };
       default:
         return { progress: artifacts.results.progress(), refresh: artifacts.results.refresh };
     }
@@ -95,6 +103,7 @@ export function App(props: { deps: UiDeps }) {
           caches: () => caches.caches().length,
           actions: workflows.total,
           issues: () => issues.issues().length,
+          secrets: () => secrets.items().length,
         }}
         progress={current().progress}
         progressKind={route() === "issues" ? "owners" : route() === "kanban" ? "projects" : "repos"}
@@ -145,6 +154,9 @@ export function App(props: { deps: UiDeps }) {
                 </Match>
                 <Match when={route() === "kanban"}>
                   <KanbanScreen state={kanban} />
+                </Match>
+                <Match when={route() === "secrets"}>
+                  <SecretsScreen state={secrets} />
                 </Match>
                 <Match when={route() === "actions"}>
                   <ActionsScreen

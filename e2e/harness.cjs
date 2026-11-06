@@ -83,6 +83,16 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       deletes.push(`run ${m[3]}`);
       return route.fulfill({ status: 204 });
     }
+    m = /^\/repos\/([^/]+)\/([^/]+)\/(?:environments\/([^/]+)|actions)\/(secrets|variables)$/.exec(p);
+    if (m) {
+      const key = `${m[1]}/${m[2]}`;
+      if (key === "locked-corp/secret-service")
+        return json(route, { message: "Resource not accessible by personal access token" }, 403, { "x-accepted-github-permissions": `${m[4]}=read` });
+      const config = fx.configByRepo[key];
+      const scope = m[3] === undefined ? config : config?.environments[decodeURIComponent(m[3])];
+      const list = scope?.[m[4]] ?? [];
+      return json(route, { total_count: list.length, [m[4]]: list });
+    }
     m = /^\/repos\/([^/]+)\/([^/]+)\/(actions\/workflows|actions\/runs|branches|environments)$/.exec(p);
     if (m) {
       const key = `${m[1]}/${m[2]}`;

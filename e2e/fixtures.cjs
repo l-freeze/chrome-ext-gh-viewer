@@ -217,7 +217,22 @@ const projectItems = {
   "octo-dev/4": [item("Issue", issueContent("octo-dev", 14), "todo4"), item("Issue", issueContent("octo-dev", 3), "done4")],
 };
 
+// Secrets と Variables。Environment は偽 API の都合で全リポジトリに staging と production がある
+const secretOrVariable = (name, value) => ({ name, ...(value === undefined ? {} : { value }), created_at: iso(40), updated_at: iso(3) });
+const configByRepo = {
+  "acme-labs/web-console": {
+    secrets: [secretOrVariable("NPM_TOKEN"), secretOrVariable("SENTRY_DSN")],
+    variables: [secretOrVariable("NODE_VERSION", "26")],
+    environments: {
+      production: { secrets: [secretOrVariable("DEPLOY_KEY")], variables: [secretOrVariable("API_URL", "https://api.acme-labs.example")] },
+      staging: { secrets: [], variables: [secretOrVariable("API_URL", "https://staging.acme-labs.example")] },
+    },
+  },
+  "octo-dev/tile-game": { secrets: [secretOrVariable("ITCH_API_KEY")], variables: [], environments: {} },
+};
+
 module.exports = {
+  configByRepo,
   viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml, cachesByRepo, oldRunsByRepo,
   projectsByOwner, statusFieldByProject, projectItems,
 };

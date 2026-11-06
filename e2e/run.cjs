@@ -203,6 +203,38 @@ const step = async (name, fn) => {
     assert.match(page.url(), /#issues$/);
   });
 
+  await step("シークレットと変数: リポジトリと Environment の分を、リポジトリごとに閲覧だけできる", async () => {
+    const before = log.length;
+    await page.getByRole("link", { name: /^Secrets & variables/ }).click();
+    const table = page.locator("table.table--secrets");
+    await table.getByText("DEPLOY_KEY").waitFor();
+    assert.equal(await table.locator(".group-row").count(), 2);
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 7);
+    await page.getByText("7 items").waitFor();
+    // Secrets の値は出さない（GitHub も返さない）。Variables は値を出す。Environment の名前を範囲に出す
+    const deployKey = table.locator("tr", { hasText: "DEPLOY_KEY" });
+    await deployKey.getByText(/^Hidden/).waitFor();
+    await deployKey.getByText("production").waitFor();
+    await table.locator("tr", { hasText: "NODE_VERSION" }).getByText("26", { exact: true }).waitFor();
+    await page.getByText("1 repository could not be read").click();
+    await page.locator(".failures").getByText("Secrets", { exact: false }).first().waitFor();
+    await page.screenshot({ path: path.join(OUT, "06e-secrets.png") });
+    await page.getByText("1 repository could not be read").click();
+
+    await page.getByRole("radio", { name: "Variables" }).click();
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 3);
+    await page.getByPlaceholder(/Name, value, environment/).fill("staging");
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 1);
+    await page.getByPlaceholder(/Name, value, environment/).fill("");
+    await page.getByRole("radio", { name: "All" }).click();
+
+    // 読むだけで、書き込みの呼び出しはしない。Environment がある分だけ呼び出しが増える
+    const requests = log.slice(before).filter((l) => /\/(actions\/(secrets|variables)|environments)/.test(l));
+    assert.ok(requests.every((l) => l.startsWith("GET ")), requests.join("\n"));
+    const forRepo = (r) => requests.filter((l) => l.includes(`/repos/${r}/`)).length;
+    assert.equal(forRepo("acme-labs/web-console"), 3 + 2 * 2);
+  });
+
   await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {
     await page.getByRole("link", { name: /^Actions/ }).click();
     await page.getByRole("link", { name: "Deploy", exact: true }).waitFor();
