@@ -26,7 +26,26 @@ const step = async (name, fn) => {
 
 (async () => {
   // ---- 英語・ライト ---------------------------------------------------------
-  const { context, page, id, log, errors, dispatches, deletes, control } = await launch();
+  const { context, page, id, log, errors, dispatches, deletes, control, storage } = await launch();
+  // 落としたファイルの記録。保存先へトークン（Authorization）が渡っていないことと、中身が zip であることを確かめる
+  const downloaded = async (urlPattern) => {
+    const [sw] = context.serviceWorkers();
+    await sw.evaluate(async () => {
+      for (let i = 0; i < 50; i++) {
+        const [latest] = await chrome.downloads.search({ orderBy: ["-startTime"], limit: 1 });
+        if (latest && latest.state !== "in_progress") return;
+        await new Promise((r) => setTimeout(r, 100));
+      }
+    });
+    const [item] = await sw.evaluate(() => chrome.downloads.search({ orderBy: ["-startTime"], limit: 1 }));
+    assert.match(item.url, urlPattern);
+    assert.equal(item.state, "complete", `${item.state} ${item.error ?? ""}`);
+    assert.equal(fs.readFileSync(item.filename).subarray(0, 2).toString(), "PK");
+    const hit = storage.requests.filter((r) => item.url.includes(r.path));
+    assert.ok(hit.length > 0, "保存先へのリクエストがない");
+    assert.ok(storage.requests.every((r) => r.authorization === null), JSON.stringify(storage.requests));
+    return item;
+  };
 
   await step("未接続ならオンボーディングを表示", async () => {
     await page.goto(`chrome-extension://${id}/manager.html`);
@@ -92,16 +111,11 @@ const step = async (name, fn) => {
 
   await step("ダウンロードを chrome.downloads で開始する", async () => {
     await page.getByRole("button", { name: "Download playwright-report" }).click();
-    await page.getByText(/Started 1 download\.|Download of playwright-report failed/).waitFor();
-    // chrome.downloads の通信は Playwright の route で差し替えられないため、Chrome が記録した内容だけを確認する
-    const [sw] = context.serviceWorkers();
-    await page.waitForTimeout(2000);
-    const items = await sw.evaluate(() => chrome.downloads.search({}));
-    const item = items[0];
-    assert.match(item.url, /\/repos\/acme-labs\/web-console\/actions\/artifacts\/\d+\/zip$/);
-    console.log("   download state:", item.state, item.error ?? "", "finalUrl:", item.finalUrl);
-    // 偽のトークンなので本物の GitHub に拒否される。中断を画面に出せているかを確認する
-    if (item.state === "interrupted") await page.getByText(/Download of playwright-report failed/).waitFor();
+    await page.getByText("Started 1 download.").waitFor();
+    // GitHub の API には頼むが、Chrome のダウンロードには保存先の署名つきの URL だけを渡す
+    assert.ok(log.some((l) => /^GET \/repos\/acme-labs\/web-console\/actions\/artifacts\/\d+\/zip$/.test(l)));
+    // 保存するファイル名は Playwright が付け替えるので、ここでは確かめない（単体テストで確かめている）
+    await downloaded(/^https:\/\/fakeresults\.blob\.core\.windows\.net\/results\/\d+\.zip\?sig=artifact$/);
   });
 
   await step("Issue を所有者横断でリポジトリごとに表示", async () => {
@@ -223,13 +237,10 @@ const step = async (name, fn) => {
 
     await table.getByRole("button", { name: "Download chrome-extension.zip" }).click();
     await page.getByText(/Started downloading chrome-extension.zip\.|Download of chrome-extension.zip failed/).waitFor();
-    const [sw] = context.serviceWorkers();
-    await page.waitForTimeout(1500);
-    const items = await sw.evaluate(() => chrome.downloads.search({ orderBy: ["-startTime"] }));
-    assert.match(items[0].url, /\/repos\/acme-labs\/web-console\/releases\/assets\/\d+$/);
+    await downloaded(/^https:\/\/release-assets\.githubusercontent\.com\/assets\/\d+\?sig=release$/);
     // リポジトリごとに 1 回だけ読む。書き込みの呼び出しはしない
     const requests = log.slice(before).filter((l) => l.includes("/releases"));
-    assert.equal(requests.filter((l) => l.startsWith("GET /repos/acme-labs/web-console/releases")).length, 1);
+    assert.equal(requests.filter((l) => l.startsWith("GET /repos/acme-labs/web-console/releases?")).length, 1);
     assert.ok(requests.every((l) => l.startsWith("GET ")), requests.join("\n"));
   });
 
@@ -363,10 +374,7 @@ const step = async (name, fn) => {
 
     await web.getByRole("button", { name: "Download playwright-report" }).click();
     await page.getByText(/Started downloading playwright-report\.|Download of playwright-report failed/).waitFor();
-    const [sw] = context.serviceWorkers();
-    await page.waitForTimeout(1500);
-    const items = await sw.evaluate(() => chrome.downloads.search({ orderBy: ["-startTime"] }));
-    assert.match(items[0].url, /\/repos\/acme-labs\/web-console\/actions\/artifacts\/\d+\/zip$/);
+    await downloaded(/^https:\/\/fakeresults\.blob\.core\.windows\.net\/results\/\d+\.zip\?sig=artifact$/);
     await page.getByRole("tab", { name: "Workflows" }).click();
   });
 

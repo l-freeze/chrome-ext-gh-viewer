@@ -1,11 +1,34 @@
 // E2E と画面撮影で共通の準備: 拡張機能を読み込んだ Chromium と、偽の GitHub。
 const { chromium } = require("playwright");
+const https = require("node:https");
+const { execFileSync } = require("node:child_process");
 const path = require("node:path");
 const fs = require("node:fs");
 const os = require("node:os");
 const fx = require("./fixtures.cjs");
 
 const DEFAULT_EXT = path.resolve(__dirname, "../.output/chrome-mv3");
+
+// ダウンロードの保存先（Azure の Blob と Release の保存先）の代わり。Chromium の名前解決をここへ向ける。
+// GitHub の API が署名つきの URL へ転送したあと、拡張機能がトークンを保存先へ渡していないかを記録する
+const STORAGE_HOSTS = { artifacts: "fakeresults.blob.core.windows.net", releases: "release-assets.githubusercontent.com" };
+const ZIP_BYTES = Buffer.from("504b0506000000000000000000000000000000000000", "hex"); // 空の zip
+
+async function startStorage() {
+  const dir = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-storage-"));
+  execFileSync("openssl", ["req", "-x509", "-newkey", "rsa:2048", "-nodes", "-days", "1", "-subj", "/CN=e2e-storage",
+    "-keyout", path.join(dir, "key.pem"), "-out", path.join(dir, "cert.pem")], { stdio: "ignore" });
+  const requests = [];
+  const server = https.createServer({ key: fs.readFileSync(path.join(dir, "key.pem")), cert: fs.readFileSync(path.join(dir, "cert.pem")) }, (req, res) => {
+    requests.push({ method: req.method, host: req.headers.host, path: req.url, authorization: req.headers.authorization ?? null });
+    const cors = { "access-control-allow-origin": "*" };
+    if (req.method === "OPTIONS") return res.writeHead(204, { ...cors, "access-control-allow-methods": "GET" }).end();
+    if (!req.url.includes("sig=")) return res.writeHead(403, { ...cors, "content-type": "application/xml" }).end("<Error><Code>AuthenticationFailed</Code></Error>");
+    res.writeHead(200, { ...cors, "content-type": "application/zip", "content-length": ZIP_BYTES.length }).end(ZIP_BYTES);
+  });
+  await new Promise((resolve) => server.listen(0, "127.0.0.1", resolve));
+  return { port: server.address().port, requests, close: () => server.close() };
+}
 
 const strip = ({ _type, ...r }) => r;
 const json = (route, body, status = 200, headers = {}) =>
@@ -55,6 +78,11 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
         return route.fulfill({ status: 204 });
       }
     }
+    if (m && m[4] && req.method() === "GET")
+      return route.fulfill({ status: 302, headers: { location: `https://${STORAGE_HOSTS.artifacts}/results/${m[3]}.zip?sig=artifact` } });
+    m = /^\/repos\/([^/]+)\/([^/]+)\/releases\/assets\/(\d+)$/.exec(p);
+    if (m && req.method() === "GET")
+      return route.fulfill({ status: 302, headers: { location: `https://${STORAGE_HOSTS.releases}/assets/${m[3]}?sig=release` } });
     m = /^\/repos\/([^/]+)\/([^/]+)\/actions\/caches(?:\/(\d+))?$/.exec(p);
     if (m) {
       const key = `${m[1]}/${m[2]}`;
@@ -221,14 +249,24 @@ function oauth(log) {
 
 async function launch({ colorScheme = "light", locale = "en-US", viewport = { width: 1440, height: 900 }, ext = DEFAULT_EXT, delayMs = 0 } = {}) {
   const dir = fs.mkdtempSync(path.join(os.tmpdir(), "e2e-profile-"));
+  const storage = await startStorage();
+  const hostRules = Object.values(STORAGE_HOSTS).map((h) => `MAP ${h} 127.0.0.1:${storage.port}`).join(",");
   const context = await chromium.launchPersistentContext(dir, {
     headless: true,
     channel: "chromium",
     colorScheme,
     locale,
     viewport,
-    args: [`--disable-extensions-except=${ext}`, `--load-extension=${ext}`, `--lang=${locale}`],
+    args: [
+      `--disable-extensions-except=${ext}`,
+      `--load-extension=${ext}`,
+      `--lang=${locale}`,
+      `--host-resolver-rules=${hostRules}`,
+      "--ignore-certificate-errors",
+      "--no-proxy-server",
+    ],
   });
+  context.on("close", () => storage.close());
   const log = [];
   const dispatches = [];
   // テストから偽 API の状態を変えるためのつまみ
@@ -261,7 +299,7 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
   page.on("pageerror", (e) => errors.push(String(e)));
   // 偽 API の 403/404 による読み込みエラーは想定どおりなので除く
   page.on("console", (m) => m.type() === "error" && !m.text().startsWith("Failed to load resource") && errors.push(m.text()));
-  return { context, page, id, log, errors, dispatches, control, deletes };
+  return { storage, context, page, id, log, errors, dispatches, control, deletes };
 }
 
 module.exports = { launch };
