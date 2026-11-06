@@ -25,11 +25,26 @@ export interface HttpRequest {
   signal?: AbortSignal;
 }
 
-/** 再試行の判断。待つならミリ秒、やめるなら null を返す。attempt は 0 から数える */
-export interface RetryPolicy {
-  onResponse?(response: Response, attempt: number): Promise<number | null> | number | null;
-  onError?(error: TransportError, attempt: number): number | null;
+export interface RetryContext {
+  /** 何回目の試行の結果か。最初は 0 */
+  attempt: number;
+  /** 最初の試行を始めてからの時間（待った時間を含む） */
+  elapsedMs: number;
+  /** 次の 1 回にかかりうる最長の時間 */
+  timeoutMs: number;
 }
+
+/** 再試行の判断。待つならミリ秒、やめるなら null を返す */
+export interface RetryPolicy {
+  onResponse?(response: Response, context: RetryContext): Promise<number | null> | number | null;
+  onError?(error: TransportError, context: RetryContext): number | null;
+}
+
+/**
+ * 再試行してよいメソッド。同じリクエストを繰り返しても結果が変わらないもの（RFC 9110 の冪等なメソッド）だけで、
+ * 呼び出し側の判断にかかわらず、ほかのメソッドは再試行しない
+ */
+const RETRYABLE_METHODS = new Set(["GET", "HEAD", "OPTIONS", "PUT", "DELETE"]);
 
 export interface HttpClient {
   /** 応答を返す（ステータスにかかわらず）。応答を得られなければ TransportError を投げる */
@@ -41,6 +56,7 @@ export interface HttpClientOptions {
   sleep?: Sleep;
   /** 1 回のリクエストの時間切れ（ミリ秒） */
   timeoutMs?: number;
+  now?: () => number;
 }
 
 export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
@@ -49,6 +65,7 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
   const fetchFn: typeof fetch = (input, init) => f(input, init);
   const wait = options.sleep ?? defaultSleep;
   const timeoutMs = options.timeoutMs ?? 30_000;
+  const now = options.now ?? (() => Date.now());
 
   async function once(request: HttpRequest): Promise<Response> {
     if (request.signal?.aborted) throw new TransportError("aborted", "Request aborted", { cause: request.signal.reason });
@@ -70,15 +87,20 @@ export function createHttpClient(options: HttpClientOptions = {}): HttpClient {
 
   return {
     async send(request, retry) {
+      const policy = RETRYABLE_METHODS.has((request.method ?? "GET").toUpperCase()) ? retry : undefined;
+      const started = now();
       for (let attempt = 0; ; attempt++) {
+        const context = (): RetryContext => ({ attempt, elapsedMs: now() - started, timeoutMs });
         let waitMs: number | null;
         try {
           const response = await once(request);
-          waitMs = retry?.onResponse ? await retry.onResponse(response, attempt) : null;
+          waitMs = policy?.onResponse ? await policy.onResponse(response, context()) : null;
           if (waitMs === null) return response;
+          // 使わない応答の本文は閉じてから次を送る
+          await response.body?.cancel().catch(() => undefined);
         } catch (e) {
           if (!(e instanceof TransportError) || e.kind === "aborted") throw e;
-          waitMs = retry?.onError ? retry.onError(e, attempt) : null;
+          waitMs = policy?.onError ? policy.onError(e, context()) : null;
           if (waitMs === null) throw e;
         }
         try {
@@ -101,10 +123,11 @@ export function parseNextLink(link: string | null): string | null {
   return null;
 }
 
-/** Retry-After ヘッダーの秒数（数値の形だけを扱う） */
-export function retryAfterSeconds(headers: Headers): number | null {
-  const v = headers.get("retry-after");
-  if (v === null || v.trim() === "") return null;
-  const n = Number(v);
-  return Number.isFinite(n) && n >= 0 ? n : null;
+/** Retry-After ヘッダー（RFC 9110: 秒数か HTTP の日時）を、今から待つミリ秒にする。ない・読めないときは null */
+export function retryAfterMs(headers: Headers, nowMs = Date.now()): number | null {
+  const value = headers.get("retry-after")?.trim();
+  if (!value) return null;
+  if (/^\d+$/.test(value)) return Number(value) * 1000;
+  const date = Date.parse(value);
+  return Number.isNaN(date) ? null : Math.max(0, date - nowMs);
 }
