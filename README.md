@@ -9,8 +9,9 @@
 - ワークフローの一覧と最新の実行を表示し、手動実行（`workflow_dispatch`）できます。入力項目はワークフローの定義に合わせて入力欄・プルダウン・チェックボックスになり、実行の前に必ず確認の画面を挟みます。実行したものは、自動更新のオン・オフに関係なく、一覧で待機中から完了まで状態を追います（依頼した直後に 1 回、その後は 1 分ごと）
 - Issue は所有者ごとに検索し、リポジトリ単位でまとめて表示します（List。Issue の操作はまだありません）
 - Projects の項目をプロジェクトごとのカンバンで表示し、カードをドラッグ＆ドロップするかキーボードの ← → で Status を変えられます（Kanban。Issue タブにマウスを合わせると List と Kanban を選べます）。PR とドラフトを表示するかはチェックで切り替えられます。プロジェクトに入っていない Issue は List にだけ表示されます
+- Actions のシークレットと変数を、リポジトリ単位と Environment 単位で全リポジトリ横断に一覧できます（閲覧専用。シークレットは値を読めないので名前と更新日だけ）。追加・変更・削除は GitHub で行います
 - 開いているタブの情報を自動で取り直します。上部の「自動更新」で切り替えられ、既定はオンです。オフでも再読み込みボタンはいつでも使えます
-  - Issue の List は 1 分ごと、Kanban は 2 分ごと
+  - Issue の List は 1 分ごと、Kanban は 2 分ごと、シークレットと変数は 1 日ごと
   - アーティファクト・キャッシュ・Actions は、選んでいるリポジトリの数から間隔を決めます。1 時間あたりの呼び出しを API の上限（5,000 回）の 1 割に収めるように切り上げ、最短 5 分です（例: 100 リポジトリならアーティファクトは 12 分ごと、Actions は 24 分ごと）
   - Actions の実行中のワークフローは、これとは別に 1 分ごとに状態を取り直します
   - ページが見えていない間は止まり、戻ったときに間隔以上たっていればすぐに取り直します。削除の確認中と削除中は取り直しません
@@ -39,7 +40,7 @@ Chrome ウェブストアには未公開のため、GitHub Actions がビルド�
 | 方式 | 内容 |
 |---|---|
 | GitHub でログイン（OAuth Device Flow） | github.com でコードを入力して承認します。ビルド時に OAuth App の Client ID が必要です |
-| Personal Access Token | Classic（`repo`, `read:org`, `project`）または Fine-grained（Actions: Read and write、Contents: Read、Issues: Read、Members: Read、Environments: Read、Organization の Projects: Read and write）。Fine-grained は所有者ごとに 1 つ追加します |
+| Personal Access Token | Classic（`repo`, `read:org`, `project`）または Fine-grained（Actions: Read and write、Contents: Read、Issues: Read、Members: Read、Environments: Read、Secrets: Read、Variables: Read、Organization の Projects: Read and write）。Fine-grained は所有者ごとに 1 つ追加します |
 
 Fine-grained の Contents: Read はワークフローの定義とブランチを読むため、Environments: Read は `environment` 型の入力を選択肢で出すために使います。Environments を読めない場合は自由入力になります。
 
