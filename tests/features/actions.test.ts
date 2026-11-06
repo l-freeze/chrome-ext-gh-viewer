@@ -187,8 +187,8 @@ describe("ワークフローと実行の判定", () => {
 
   it("追っている実行は、そのワークフローの最新の実行と同じか新しいときだけ差し替える", () => {
     const list = [
-      { workflow: workflow(10, "CI"), lastRun: run(5, 10, "2026-01-05T00:00:00Z") },
-      { workflow: workflow(20, "Deploy"), lastRun: null },
+      { workflow: workflow(10, "CI"), lastRun: run(5, 10, "2026-01-05T00:00:00Z"), recentRuns: [run(5, 10, "2026-01-05T00:00:00Z")] },
+      { workflow: workflow(20, "Deploy"), lastRun: null, recentRuns: [] },
     ];
     const queued = run(6, 10, "2026-01-06T00:00:00Z", { status: "queued", conclusion: null });
     expect(withLatestRun(list, queued).map((w) => w.lastRun?.id ?? null)).toEqual([6, null]);
