@@ -1,10 +1,10 @@
 // アーティファクト・キャッシュ・Actions・リポジトリの中身の API 呼び出しと応答の読み取り。
 import { describe, expect, it } from "vitest";
 import { dispatchWorkflow, deleteRun, getRun, listRecentRuns, listWorkflows, readRun, searchRuns } from "../../../src/integrations/github/actions";
-import { artifactZipRequest, deleteArtifact, listArtifacts, readArtifact } from "../../../src/integrations/github/artifacts";
+import { artifactDownloadUrl, deleteArtifact, listArtifacts, readArtifact } from "../../../src/integrations/github/artifacts";
 import { deleteCache, listCaches } from "../../../src/integrations/github/caches";
 import { getFileText, listBranches, listEnvironments } from "../../../src/integrations/github/contents";
-import { json, rawArtifact, testHttp } from "../../helpers";
+import { json, rawArtifact, redirectedTo, testHttp } from "../../helpers";
 
 const repo = { owner: "acme", name: "web" };
 
@@ -32,9 +32,25 @@ describe("アーティファクト", () => {
     const { http, calls } = testHttp(() => new Response(null, { status: 204 }));
     await deleteArtifact(http, repo, 42);
     expect(`${calls[0]!.method} ${calls[0]!.url.pathname}`).toBe("DELETE /repos/acme/web/actions/artifacts/42");
-    const req = artifactZipRequest(http, repo, 7);
-    expect(req.url).toBe("https://api.github.com/repos/acme/web/actions/artifacts/7/zip");
-    expect(req.headers).toContainEqual({ name: "Authorization", value: "Bearer ghp_test" });
+  });
+
+  it("ダウンロードは API に頼み、転送先の署名つきの URL を返す。本文は受け取らずに閉じる", async () => {
+    let cancelled = 0;
+    const { http, calls } = testHttp(() => redirectedTo("https://productionresultssa1.blob.core.windows.net/a.zip?sig=x", { onCancel: () => void cancelled++ }));
+    expect(await artifactDownloadUrl(http, repo, 7)).toBe("https://productionresultssa1.blob.core.windows.net/a.zip?sig=x");
+    expect(calls.map((c) => c.url.href)).toEqual(["https://api.github.com/repos/acme/web/actions/artifacts/7/zip"]);
+    // 転送先で CORS の確認が要らないよう、ヘッダーは Accept と Authorization だけ
+    expect([...calls[0]!.headers.keys()].sort()).toEqual(["accept", "authorization"]);
+    expect(cancelled).toBe(1);
+  });
+
+  it("転送されずに API が答えたら、エラーの分類か unexpected を返す。転送先が失敗しても URL は返さない", async () => {
+    const notFound = testHttp(() => json({ message: "Not Found" }, { status: 404 }));
+    await expect(artifactDownloadUrl(notFound.http, repo, 7)).rejects.toMatchObject({ kind: "not_found" });
+    const noRedirect = testHttp(() => json({}));
+    await expect(artifactDownloadUrl(noRedirect.http, repo, 7)).rejects.toMatchObject({ kind: "unexpected" });
+    const expired = testHttp(() => redirectedTo("https://productionresultssa1.blob.core.windows.net/a.zip?sig=x", { status: 403 }));
+    await expect(artifactDownloadUrl(expired.http, repo, 7)).rejects.toMatchObject({ kind: "unexpected", status: 403 });
   });
 });
 

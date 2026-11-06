@@ -1,7 +1,10 @@
 import { defineConfig } from "wxt";
 
-// 拡張機能のページから通信してよい宛先。トークンを GitHub 以外へ送らないことを CSP でも保証する
+// 拡張機能のページから通信してよい宛先。トークンを付けるのは api.github.com と github.com だけ
 const CONNECT_SRC = ["https://api.github.com", "https://github.com"];
+// ダウンロードの転送先（アーティファクトと Release の添付ファイルの保存先）。署名つきの URL を得るために読むだけで、
+// トークンは送らない（fetch が別のオリジンへの転送で Authorization を外す）
+const DOWNLOAD_STORAGE = ["https://*.blob.core.windows.net", "https://release-assets.githubusercontent.com", "https://objects.githubusercontent.com"];
 
 export default defineConfig({
   srcDir: "src",
@@ -12,8 +15,8 @@ export default defineConfig({
     name: "__MSG_extName__",
     description: "__MSG_extDescription__",
     default_locale: "en",
-    // AbortSignal.any（Chrome 116）を使う
-    minimum_chrome_version: "116",
+    // 別のオリジンへの転送で Authorization を外す fetch（Chrome 119）に頼るため。AbortSignal.any（Chrome 116）も使う
+    minimum_chrome_version: "119",
     permissions: ["storage", "downloads"],
     host_permissions: CONNECT_SRC.map((origin) => `${origin}/*`),
     action: { default_title: "__MSG_extName__" },
@@ -24,7 +27,7 @@ export default defineConfig({
             extension_pages: [
               "script-src 'self'",
               "object-src 'none'",
-              `connect-src ${CONNECT_SRC.join(" ")}`,
+              `connect-src ${[...CONNECT_SRC, ...DOWNLOAD_STORAGE].join(" ")}`,
               "img-src 'self' data: https://avatars.githubusercontent.com",
             ].join("; "),
           },

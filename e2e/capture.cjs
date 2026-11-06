@@ -135,7 +135,7 @@ async function connected(page, id, opts) {
     await page.getByRole("button", { name: "Download playwright-report" }).click();
     await page.getByText(/Download of playwright-report failed|Started 1 download/).waitFor();
     await page.waitForTimeout(1500);
-    await shot(page, "Artifacts", "20-artifacts-download-failed.png", "ダウンロード失敗の通知（偽トークンのため GitHub が 401 を返した）");
+    await shot(page, "Artifacts", "20-artifacts-download-started.png", "ダウンロードを始めた通知（保存先の署名つきの URL から落とす）");
 
     // ---- Issue ----
     await page.getByRole("link", { name: /^Issues/ }).click();

@@ -13,10 +13,11 @@ export interface ReleaseOperations {
 
 export interface ReleaseSource {
   list(repo: RepoRef, signal?: AbortSignal): Promise<Release[]>;
-  downloadRequest(asset: ReleaseAsset): { url: string; headers: Array<{ name: string; value: string }> };
+  /** 認証なしで取れる、ダウンロード用の URL */
+  downloadUrl(asset: ReleaseAsset): Promise<string>;
 }
 
 export interface Downloader {
-  start(request: { url: string; headers: Array<{ name: string; value: string }>; filename: string }): Promise<number>;
+  start(request: { url: string; filename: string }): Promise<number>;
   onInterrupted(listener: (id: number, reason: string) => void): () => void;
 }

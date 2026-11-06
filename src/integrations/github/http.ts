@@ -101,6 +101,38 @@ export class GitHubHttp {
     };
   }
 
+  /**
+   * ダウンロード用の API（GitHub が署名つきの保存先 URL へ転送するもの）を呼び、転送先の URL を返す。
+   * トークンは API への最初のリクエストにだけ付く: fetch は別のオリジンへ転送するとき Authorization を外す
+   * （Fetch Standard。Chrome 119 以降）。転送先の本文は受け取らずに閉じる。
+   * 転送先で CORS の確認が要らないよう、ヘッダーは Accept と Authorization だけにする
+   */
+  async downloadUrl(pathOrUrl: string, accept: string, signal?: AbortSignal): Promise<string> {
+    const url = this.url(pathOrUrl);
+    let response: Response;
+    try {
+      response = await this.client.send({ url, headers: { Accept: accept, Authorization: `Bearer ${this.token}` }, ...(signal ? { signal } : {}) });
+    } catch (e) {
+      if (e instanceof TransportError) {
+        throw new GitHubApiError({ kind: e.kind === "aborted" ? "aborted" : "network", message: e.message, url, cause: e });
+      }
+      throw e;
+    }
+    const final = response.url;
+    const sameOrigin = new URL(final || url).origin === new URL(url).origin;
+    if (sameOrigin) {
+      // 転送されずに API が答えた（エラーなど）
+      if (!response.ok) throw await toApiError(response, url, parseRateLimit(response.headers), this.now());
+      await response.body?.cancel().catch(() => undefined);
+      throw new GitHubApiError({ kind: "unexpected", message: "GitHub did not redirect to a download URL", url });
+    }
+    await response.body?.cancel().catch(() => undefined);
+    if (!response.ok || new URL(final).protocol !== "https:") {
+      throw new GitHubApiError({ kind: "unexpected", message: `Download URL answered ${response.status}`, url, status: response.status });
+    }
+    return final;
+  }
+
   /** 成功（2xx）したレスポンスを返す。失敗は GitHubApiError を投げる */
   async request(pathOrUrl: string, options: RequestOptions = {}): Promise<Response> {
     const method = options.method ?? "GET";

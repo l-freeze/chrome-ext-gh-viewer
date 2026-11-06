@@ -1,4 +1,4 @@
-import { artifactZipRequest, deleteArtifact, listArtifacts, type GitHubArtifact } from "../../../integrations/github/artifacts";
+import { artifactDownloadUrl, deleteArtifact, listArtifacts, type GitHubArtifact } from "../../../integrations/github/artifacts";
 import { isGitHubApiError } from "../../../integrations/github/errors";
 import type { GitHubHttp } from "../../../integrations/github/http";
 import type { RepoRef } from "../../workspace/repository";
@@ -34,6 +34,6 @@ export function createGitHubArtifactSource(httpFor: (repo: RepoRef) => GitHubHtt
         if (!isGitHubApiError(e, "not_found")) throw e;
       }
     },
-    downloadRequest: (item) => artifactZipRequest(httpFor(item.repo), item.repo, item.id),
+    downloadUrl: (item) => artifactDownloadUrl(httpFor(item.repo), item.repo, item.id),
   };
 }

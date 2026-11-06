@@ -16,10 +16,11 @@ export interface ArtifactOperations {
 export interface ArtifactSource {
   list(repo: RepoRef, signal?: AbortSignal): Promise<Artifact[]>;
   remove(item: Artifact, signal?: AbortSignal): Promise<void>;
-  downloadRequest(item: Artifact): { url: string; headers: Array<{ name: string; value: string }> };
+  /** 認証なしで取れる、ダウンロード用の URL */
+  downloadUrl(item: Artifact): Promise<string>;
 }
 
 export interface Downloader {
-  start(request: { url: string; headers: Array<{ name: string; value: string }>; filename: string }): Promise<number>;
+  start(request: { url: string; filename: string }): Promise<number>;
   onInterrupted(listener: (id: number, reason: string) => void): () => void;
 }

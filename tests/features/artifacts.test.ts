@@ -89,16 +89,16 @@ describe("操作", () => {
     const source: ArtifactSource = {
       list: async (r) => (r.name === "locked" ? Promise.reject(new Error("forbidden")) : [artifact(1, { repo: r })]),
       remove: async () => undefined,
-      downloadRequest: () => ({ url: "u", headers: [] }),
+      downloadUrl: async () => "u",
     };
     const res = await createArtifactsFeature({ source, downloader }).list([repo("a", 1), repo("locked", 2)]);
     expect(res.map((r) => r.ok)).toEqual([true, false]);
   });
 
-  it("ダウンロードは取得先とファイル名を渡す", async () => {
-    const source: ArtifactSource = { list: async () => [], remove: async () => undefined, downloadRequest: (a) => ({ url: `zip/${a.id}`, headers: [] }) };
+  it("ダウンロードには、認証なしで取れる URL とファイル名だけを渡す（ヘッダーは渡さない）", async () => {
+    const source: ArtifactSource = { list: async () => [], remove: async () => undefined, downloadUrl: async (a) => `https://store.example/zip/${a.id}?sig=x` };
     await createArtifactsFeature({ source, downloader }).download(artifact(9));
-    expect(started.at(-1)).toMatchObject({ url: "zip/9", filename: "acme-web-a-9-9.zip" });
+    expect(started.at(-1)).toEqual({ url: "https://store.example/zip/9?sig=x", filename: "acme-web-a-9-9.zip" });
   });
 
   it("GitHub 経由の削除では、すでに消えているもの（404）を成功とみなす", async () => {

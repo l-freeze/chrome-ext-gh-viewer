@@ -48,7 +48,11 @@ Fine-grained の Contents: Read はワークフローの定義とブランチを
 
 カンバンには `project` スコープ（Fine-grained では Organization の Projects 権限）が必要です。このスコープを追加する前に GitHub でログインした場合は、一度ログアウトしてログインし直してください。個人アカウントのプロジェクトを Fine-grained PAT で扱えるかは確認できていません。
 
-トークンは `chrome.storage.local` にだけ保存され、`github.com` と `api.github.com` 以外には送信されません。拡張機能のページには `connect-src https://api.github.com https://github.com` の CSP を設定しています。
+トークンは `chrome.storage.local` にだけ保存され、`github.com` と `api.github.com` 以外には送信されません。
+
+アーティファクトと Release の添付ファイルは、GitHub の API が署名つきの保存先 URL（Azure の Blob や `release-assets.githubusercontent.com`）へ転送します。拡張機能はトークンを付けて API に頼み、転送先の URL だけを受け取ってから、その URL をトークンなしで Chrome のダウンロードに渡します。別のドメインへ転送するときに Authorization ヘッダーを外すブラウザの仕様（Chrome 119 以降）を使うので、Chrome 119 以上が必要です。
+
+拡張機能のページには、`connect-src` を GitHub と上の保存先に限る CSP を設定しています。
 
 ## 開発
 

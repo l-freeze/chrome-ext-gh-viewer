@@ -3,7 +3,7 @@ import { createReleasesFeature } from "../../src/features/releases/compose";
 import { createGitHubReleaseSource } from "../../src/features/releases/gateways/github";
 import { filterReleases, sortReleases, type Release } from "../../src/features/releases/release";
 import type { Repository } from "../../src/features/workspace/repository";
-import { json, testHttp } from "../helpers";
+import { json, redirectedTo, testHttp } from "../helpers";
 
 const repo: Repository = {
   id: 1, owner: { login: "acme", id: 1, type: "Organization", avatarUrl: "" }, name: "web", fullName: "acme/web",
@@ -47,8 +47,10 @@ describe("GitHub から読む", () => {
     ]);
   });
 
-  it("添付ファイルは API の URL に octet-stream を求めてダウンロードし、ファイル名はそのまま使う", async () => {
-    const { http } = testHttp(() => json([rawRelease(2)]));
+  it("添付ファイルは API に octet-stream を求めて署名つきの URL を得て、それだけをダウンロードに渡す", async () => {
+    const { http, calls } = testHttp((c) =>
+      c.url.pathname.includes("/releases/assets/") ? redirectedTo("https://release-assets.githubusercontent.com/x?sig=y") : json([rawRelease(2)]),
+    );
     const started: unknown[] = [];
     const f = createReleasesFeature({
       source: createGitHubReleaseSource(() => http),
@@ -57,9 +59,9 @@ describe("GitHub から読む", () => {
     const [res] = await f.list([repo]);
     const asset = res!.ok ? res!.value[0]!.assets[0]! : null;
     expect(await f.download(asset!)).toBe(42);
-    const request = started[0] as { url: string; filename: string; headers: Array<{ name: string; value: string }> };
-    expect(request.url).toBe("https://api.github.com/repos/acme/web/releases/assets/20");
-    expect(request.filename).toBe("chrome-extension.zip");
-    expect(Object.fromEntries(request.headers.map((h) => [h.name, h.value]))).toMatchObject({ Accept: "application/octet-stream", Authorization: "Bearer ghp_test" });
+    expect(started).toEqual([{ url: "https://release-assets.githubusercontent.com/x?sig=y", filename: "chrome-extension.zip" }]);
+    const apiCall = calls.at(-1)!;
+    expect(apiCall.url.href).toBe("https://api.github.com/repos/acme/web/releases/assets/20");
+    expect(Object.fromEntries(apiCall.headers)).toEqual({ accept: "application/octet-stream", authorization: "Bearer ghp_test" });
   });
 });

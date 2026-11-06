@@ -68,14 +68,9 @@ export async function listReleases(http: GitHubHttp, repo: RepoPath, call: Call 
 }
 
 /**
- * 添付ファイルをダウンロードするリクエスト。API の URL に application/octet-stream を求めると、
- * GitHub が署名つきの保存先へ転送する（private リポジトリのファイルも認証つきで落とせる）
+ * 添付ファイルの署名つきの URL。API の URL に application/octet-stream を求めると、
+ * GitHub が保存先へ転送する（private リポジトリのファイルも、トークンを保存先へ渡さずに落とせる）
  */
-export function releaseAssetRequest(
-  http: GitHubHttp,
-  repo: RepoPath,
-  assetId: number,
-): { url: string; headers: Array<{ name: string; value: string }> } {
-  const url = http.url(`${repoPath(repo)}/releases/assets/${assetId}`);
-  return { url, headers: Object.entries(http.headers("application/octet-stream")).map(([name, value]) => ({ name, value })) };
+export function releaseAssetDownloadUrl(http: GitHubHttp, repo: RepoPath, assetId: number): Promise<string> {
+  return http.downloadUrl(`${repoPath(repo)}/releases/assets/${assetId}`, "application/octet-stream");
 }
