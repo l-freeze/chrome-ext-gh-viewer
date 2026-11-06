@@ -5,6 +5,7 @@ import { ActionsScreen } from "../screens/actions/ActionsScreen";
 import { createRunCleanupState } from "../screens/actions/cleanup-state";
 import { DispatchDialog } from "../screens/actions/DispatchDialog";
 import { createDispatchState } from "../screens/actions/dispatch-state";
+import { createWorkflowArtifactsState } from "../screens/actions/artifacts-state";
 import { createWorkflowListState } from "../screens/actions/list-state";
 import { ArtifactsScreen } from "../screens/artifacts/ArtifactsScreen";
 import { createArtifactsState } from "../screens/artifacts/state";
@@ -50,7 +51,11 @@ export function App(props: { deps: UiDeps }) {
   const ws = createWorkspaceState(deps, settings.active);
   const artifacts = createArtifactsState(deps, ws);
   const caches = createCachesState(deps, ws, () => route() === "caches");
-  const workflows = createWorkflowListState(deps, ws, () => route() === "actions", autoRefresh.enabled);
+  // 実行が完了したら、そのリポジトリのアーティファクトを取り直す（新しい成果物を Actions のパネルにも出すため）
+  const workflows = createWorkflowListState(deps, ws, () => route() === "actions", autoRefresh.enabled, {
+    onRunFinished: (repo) => artifacts.results.reload([repo]),
+  });
+  const workflowArtifacts = createWorkflowArtifactsState(deps, { artifacts: artifacts.results.values, workflows: workflows.results.values });
   const dispatch = createDispatchState(deps, (repo, run) => workflows.afterDispatch(repo, run));
   const cleanup = createRunCleanupState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
@@ -172,6 +177,7 @@ export function App(props: { deps: UiDeps }) {
                   <ActionsScreen
                     state={workflows}
                     cleanup={cleanup}
+                    artifacts={workflowArtifacts}
                     repoCount={ws.selectedRepos().length}
                     onRun={(target) => void dispatch.open(target)}
                   />

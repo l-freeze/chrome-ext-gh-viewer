@@ -39,3 +39,47 @@
   font-weight: 500;
   line-height: 20px;
 }
+
+/* ---- ダウンロードのボタン（Releases と Actions のアーティファクト） ---------------------- */
+
+.assets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.asset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.asset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.asset__name {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+.asset__meta {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+}
+.asset--expired {
+  cursor: default;
+  color: var(--text-3);
+  background: var(--surface-2);
+}

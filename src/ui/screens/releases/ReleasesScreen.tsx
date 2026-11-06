@@ -17,9 +17,9 @@ export function ReleasesScreen(props: { state: ReleasesState }) {
   const noticeText = (n: ReleaseNotice) => {
     switch (n.kind) {
       case "downloadStarted":
-        return t("releases.downloadStarted", { name: n.name });
+        return t("download.started", { name: n.name });
       case "downloadFailed":
-        return t("releases.downloadFailed", { name: n.name, reason: downloadFailureText(t, n.reason) });
+        return t("download.failed", { name: n.name, reason: downloadFailureText(t, n.reason) });
       case "error":
         return errorText(t, n.error);
     }
@@ -126,7 +126,7 @@ export function ReleasesScreen(props: { state: ReleasesState }) {
                                     type="button"
                                     class="asset"
                                     onClick={() => void s.download(asset)}
-                                    aria-label={t("releases.download", { name: asset.name })}
+                                    aria-label={t("download.button", { name: asset.name })}
                                   >
                                     <Icon name="download" size={14} />
                                     <span class="asset__name">{asset.name}</span>

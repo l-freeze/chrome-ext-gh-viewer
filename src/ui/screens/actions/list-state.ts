@@ -29,7 +29,14 @@ export interface WorkflowGroup {
   workflows: WorkflowWithRun[];
 }
 
-export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active: Accessor<boolean>, autoRefresh: Accessor<boolean>) {
+export function createWorkflowListState(
+  deps: UiDeps,
+  ws: WorkspaceState,
+  active: Accessor<boolean>,
+  autoRefresh: Accessor<boolean>,
+  /** onRunFinished: 追っていた実行が完了したとき（そのリポジトリの成果物を取り直すため） */
+  events: { onRunFinished?: (repo: Repository) => void } = {},
+) {
   const ops = deps.manager.actions;
   const [text, setText] = createSignal("");
   const [hideDisabled, setHideDisabled] = createSignal(true);
@@ -77,10 +84,17 @@ export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active
         // 一時的な失敗は次の回に任せる（一覧の表示はそのまま）
       }
     });
+    const finished: Repository[] = [];
     results.update((repo, list) => {
       const latest = updates.get(repo.id);
-      return latest ? list.map((w) => ({ ...w, lastRun: latest.get(w.workflow.id) ?? w.lastRun })) : list;
+      if (!latest) return list;
+      // 終わっていなかった最新の実行が、完了したか新しい実行に替わったら、そのリポジトリを知らせる
+      if (list.some((w) => w.lastRun !== null && !isFinished(w.lastRun) && latest.get(w.workflow.id) !== undefined && (latest.get(w.workflow.id)!.id !== w.lastRun.id || isFinished(latest.get(w.workflow.id)!)))) {
+        finished.push(repo);
+      }
+      return [...latest.values()].reduce((next, run) => withLatestRun(next, run), list);
     });
+    for (const repo of finished) events.onRunFinished?.(repo);
   }
 
   // ブラウザのタブが裏にあるときは問い合わせない
@@ -118,6 +132,7 @@ export function createWorkflowListState(deps: UiDeps, ws: WorkspaceState, active
       const latest = run;
       results.update((r, list) => (r.id === repo.id ? withLatestRun(list, latest) : list));
       if (!isFinished(run)) later(check);
+      else events.onRunFinished?.(repo);
     };
     void check();
   }

@@ -160,3 +160,66 @@
   margin: 0;
   overflow-wrap: anywhere;
 }
+
+/* ---- アーティファクトのパネル（ワークフロー・実行ごとの成果物） ----------------------- */
+
+.workflow-artifacts__note {
+  margin: -4px 0 12px;
+}
+.workflow-artifacts .notice {
+  justify-content: space-between;
+}
+.wa-repo {
+  margin-bottom: 12px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+}
+.wa-repo__title {
+  margin: 0;
+  padding: 8px 12px;
+  border-bottom: 1px solid var(--border);
+  background: var(--surface-2);
+  font-size: 14px;
+}
+.wa-repo__title a {
+  color: var(--text);
+}
+.wa-workflow {
+  padding: 8px 12px 10px;
+}
+.wa-workflow + .wa-workflow {
+  border-top: 1px solid var(--border);
+}
+.wa-workflow__title {
+  margin: 0 0 6px;
+  font-size: 13px;
+}
+.wa-workflow__title a {
+  color: var(--text);
+}
+.wa-runs {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.wa-run {
+  display: grid;
+  grid-template-columns: minmax(220px, 320px) 1fr;
+  gap: 4px 16px;
+  align-items: start;
+}
+.wa-run__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+}
+@media (max-width: 640px) {
+  .wa-run {
+    grid-template-columns: 1fr;
+  }
+}

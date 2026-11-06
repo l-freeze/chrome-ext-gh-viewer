@@ -8,18 +8,21 @@ import type { DispatchTarget } from "./dispatch-state";
 import type { RunCleanupState } from "./cleanup-state";
 import type { WorkflowListState } from "./list-state";
 import { RunCleanup } from "./RunCleanup";
+import type { WorkflowArtifactsState } from "./artifacts-state";
+import { WorkflowArtifacts } from "./WorkflowArtifacts";
 import "./actions.css";
 
 export function ActionsScreen(props: {
   state: WorkflowListState;
   cleanup: RunCleanupState;
+  artifacts: WorkflowArtifactsState;
   repoCount: number;
   onRun: (target: DispatchTarget) => void;
 }) {
   const { i18n } = useUi();
   const { t } = i18n;
   const s = props.state;
-  const [view, setView] = createSignal<"list" | "cleanup">("list");
+  const [view, setView] = createSignal<"list" | "cleanup" | "artifacts">("list");
 
   return (
     <div class="workflows">
@@ -30,7 +33,13 @@ export function ActionsScreen(props: {
         <button type="button" role="tab" aria-selected={view() === "cleanup"} onClick={() => setView("cleanup")}>
           {t("workflows.view.cleanup")}
         </button>
+        <button type="button" role="tab" aria-selected={view() === "artifacts"} onClick={() => setView("artifacts")}>
+          {t("workflows.view.artifacts")}
+        </button>
       </div>
+      <Show when={view() === "artifacts"}>
+        <WorkflowArtifacts state={props.artifacts} />
+      </Show>
       <Show when={view() === "cleanup"}>
         <RunCleanup state={props.cleanup} repoCount={props.repoCount} />
       </Show>
