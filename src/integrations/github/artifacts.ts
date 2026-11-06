@@ -57,11 +57,6 @@ export async function deleteArtifact(http: GitHubHttp, repo: RepoPath, id: numbe
  * ZIP を取得するための URL とヘッダー。この URL は署名付きのストレージ URL へリダイレクトする。
  * ブラウザのダウンロード機能に渡す想定
  */
-export function artifactZipRequest(
-  http: GitHubHttp,
-  repo: RepoPath,
-  id: number,
-): { url: string; headers: Array<{ name: string; value: string }> } {
-  const url = http.url(`${repoPath(repo)}/actions/artifacts/${id}/zip`);
-  return { url, headers: Object.entries(http.headers()).map(([name, value]) => ({ name, value })) };
+export function artifactDownloadUrl(http: GitHubHttp, repo: RepoPath, id: number): Promise<string> {
+  return http.downloadUrl(`${repoPath(repo)}/actions/artifacts/${id}/zip`, "application/vnd.github+json");
 }

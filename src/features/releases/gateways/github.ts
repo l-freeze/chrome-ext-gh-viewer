@@ -1,5 +1,5 @@
 import type { GitHubHttp } from "../../../integrations/github/http";
-import { listReleases, releaseAssetRequest, type GitHubRelease } from "../../../integrations/github/releases";
+import { listReleases, releaseAssetDownloadUrl, type GitHubRelease } from "../../../integrations/github/releases";
 import type { RepoRef } from "../../workspace/repository";
 import type { Release } from "../release";
 import type { ReleaseSource } from "../ports";
@@ -22,6 +22,6 @@ export function toRelease(r: GitHubRelease, repo: RepoRef): Release {
 export function createGitHubReleaseSource(httpFor: (repo: RepoRef) => GitHubHttp): ReleaseSource {
   return {
     list: async (repo, signal) => (await listReleases(httpFor(repo), repo, signal ? { signal } : {})).map((r) => toRelease(r, repo)),
-    downloadRequest: (asset) => releaseAssetRequest(httpFor(asset.repo), asset.repo, asset.id),
+    downloadUrl: (asset) => releaseAssetDownloadUrl(httpFor(asset.repo), asset.repo, asset.id),
   };
 }

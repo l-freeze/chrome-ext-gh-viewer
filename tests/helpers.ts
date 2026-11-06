@@ -34,6 +34,15 @@ export function json(body: unknown, init: { status?: number; headers?: Record<st
   });
 }
 
+/** fetch が転送をたどったあとの応答（url と redirected は Response の作成時には指定できないので後から付ける） */
+export function redirectedTo(url: string, init: { status?: number; body?: string; onCancel?: () => void } = {}): Response {
+  const body = new ReadableStream({ pull: (c) => c.enqueue(new TextEncoder().encode(init.body ?? "PK")), cancel: () => init.onCancel?.() });
+  const res = new Response(body, { status: init.status ?? 200 });
+  Object.defineProperty(res, "url", { value: url });
+  Object.defineProperty(res, "redirected", { value: true });
+  return res;
+}
+
 /** 待たずに、待とうとした時間だけ記録する sleep */
 export function recordingSleep() {
   const waits: number[] = [];
