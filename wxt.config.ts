@@ -12,6 +12,8 @@ export default defineConfig({
     name: "__MSG_extName__",
     description: "__MSG_extDescription__",
     default_locale: "en",
+    // AbortSignal.any（Chrome 116）を使う
+    minimum_chrome_version: "116",
     permissions: ["storage", "downloads"],
     host_permissions: CONNECT_SRC.map((origin) => `${origin}/*`),
     action: { default_title: "__MSG_extName__" },
@@ -21,7 +23,7 @@ export default defineConfig({
           content_security_policy: {
             extension_pages: [
               "script-src 'self'",
-              "object-src 'self'",
+              "object-src 'none'",
               `connect-src ${CONNECT_SRC.join(" ")}`,
               "img-src 'self' data: https://avatars.githubusercontent.com",
             ].join("; "),
