@@ -74,7 +74,8 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
         control.hideRunGets--;
         return json(route, { message: "Not Found" }, 404);
       }
-      const run = (control.runs[`${m[1]}/${m[2]}`] ?? []).find((r) => r.id === Number(m[3]));
+      const key = `${m[1]}/${m[2]}`;
+      const run = [...(control.runs[key] ?? []), ...(fx.archivedRunsByRepo[key] ?? [])].find((r) => r.id === Number(m[3]));
       return run ? json(route, run) : json(route, { message: "Not Found" }, 404);
     }
     if (m && req.method() === "DELETE") {

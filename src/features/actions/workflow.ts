@@ -38,6 +38,8 @@ export interface WorkflowWithRun {
   workflow: Workflow;
   /** 最近の実行履歴（1 ページ分）の中での最新の実行。なければ null */
   lastRun: WorkflowRun | null;
+  /** 最近の実行履歴（1 ページ分）の中の、このワークフローの実行（新しい順） */
+  recentRuns: WorkflowRun[];
 }
 
 export function isFinished(run: Pick<WorkflowRun, "status">): boolean {
@@ -53,8 +55,16 @@ export function withLatestRun(list: readonly WorkflowWithRun[], run: WorkflowRun
     if (w.workflow.id !== run.workflowId) return w;
     const cur = w.lastRun;
     const newer = cur === null || cur.id === run.id || Date.parse(run.createdAt) >= Date.parse(cur.createdAt);
-    return newer ? { ...w, lastRun: run } : w;
+    const recentRuns = [run, ...w.recentRuns.filter((r) => r.id !== run.id)].sort((a, b) => Date.parse(b.createdAt) - Date.parse(a.createdAt));
+    return { ...w, lastRun: newer ? run : cur, recentRuns };
   });
+}
+
+/** 新しい順に並んだ実行履歴を、ワークフローごとに分ける */
+export function runsByWorkflow(runs: readonly WorkflowRun[]): Map<number, WorkflowRun[]> {
+  const byWorkflow = new Map<number, WorkflowRun[]>();
+  for (const run of runs) byWorkflow.set(run.workflowId, [...(byWorkflow.get(run.workflowId) ?? []), run]);
+  return byWorkflow;
 }
 
 /** 新しい順に並んだ実行履歴から、ワークフローごとの最新の実行を取り出す */

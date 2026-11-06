@@ -102,6 +102,10 @@ const run = (repoKey, wf, ageDays, status, conclusion, branch = "master", event 
   html_url: `https://github.com/${repoKey}/actions/runs/${runId}`,
 });
 const [ci, deploy] = workflowsByRepo["acme-labs/web-console"];
+// 最近の実行履歴（1 ページ分）には出ない古い実行。実行を 1 件読む API だけが返す
+const archivedRunsByRepo = {
+  "acme-labs/web-console": [{ ...run("acme-labs/web-console", deploy, 89, "completed", "success", "release/1.9"), run_number: 3 }],
+};
 const runsByRepo = {
   "acme-labs/web-console": [
     run("acme-labs/web-console", ci, 0, "in_progress", null, "feat/billing-page"),
@@ -110,6 +114,16 @@ const runsByRepo = {
   ],
   "acme-labs/data-pipeline": [run("acme-labs/data-pipeline", workflowsByRepo["acme-labs/data-pipeline"][0], 1, "completed", "success")],
 };
+// アーティファクトを、作った実行に結びつける（Actions のタブのアーティファクトのパネル用）。
+// 結びつけないものは、どの実行でもない ID のまま（ワークフロー不明になる）
+{
+  // coverage-lcov は E2E の途中で削除される
+  const ciDone = runsByRepo["acme-labs/web-console"][1];
+  const byName = Object.fromEntries(artifactsByRepo["acme-labs/web-console"].map((a) => [a.name, a]));
+  byName["playwright-report"].workflow_run.id = ciDone.id;
+  byName["dist-bundle"].workflow_run.id = archivedRunsByRepo["acme-labs/web-console"][0].id;
+}
+
 const workflowYaml = {
   ".github/workflows/ci.yml": "name: CI\non:\n  push:\n  pull_request:\njobs: {}\n",
   ".github/workflows/deploy.yml": [
@@ -250,6 +264,7 @@ const releasesByRepo = {
 };
 
 module.exports = {
+  archivedRunsByRepo,
   releasesByRepo,
   configByRepo,
   viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml, cachesByRepo, oldRunsByRepo,

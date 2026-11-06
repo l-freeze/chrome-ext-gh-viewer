@@ -4,6 +4,7 @@ const path = require("node:path");
 const fs = require("node:fs");
 const assert = require("node:assert/strict");
 const { launch } = require("./harness.cjs");
+const fx = require("./fixtures.cjs");
 
 const OUT = path.resolve(process.argv[2] ?? path.join(__dirname, "screenshots"));
 fs.mkdirSync(OUT, { recursive: true });
@@ -336,6 +337,37 @@ const step = async (name, fn) => {
     await dialog.getByText(/On legacy, this workflow has no workflow_dispatch trigger/).waitFor();
     await dialog.getByRole("button", { name: "Close" }).click();
     assert.equal(dispatches.length, 1);
+  });
+
+  await step("Actions: アーティファクトのパネルで、ワークフロー・実行ごとの成果物を落とせる", async () => {
+    const before = log.length;
+    await page.getByRole("tab", { name: "Artifacts" }).click();
+    const web = page.locator(".wa-repo", { hasText: "web-console" });
+    // 最近の実行にあるものは呼び出しなしで、古い実行は 1 回だけ読んでワークフローが分かる
+    await web.locator(".wa-workflow", { hasText: "Deploy" }).getByText("dist-bundle").waitFor();
+    await web.locator(".wa-workflow", { hasText: "CI" }).getByText("playwright-report").waitFor();
+    await web.locator(".wa-workflow", { hasText: "Deploy" }).getByText(/#3 · release\/1\.9/).waitFor();
+    // 実行が見つからないものは「ワークフロー不明」にまとめ、期限切れは落とせない
+    const mobile = page.locator(".wa-repo", { hasText: "mobile-app" });
+    await mobile.getByText("Unknown workflow").waitFor();
+    await mobile.locator(".asset--expired", { hasText: "ios-simulator-build" }).getByText("Expired").waitFor();
+    await page.screenshot({ path: path.join(OUT, "08b-actions-artifacts.png") });
+    const runGets = log.slice(before).filter((l) => /^GET \/repos\/acme-labs\/web-console\/actions\/runs\/\d+$/.test(l));
+    assert.equal(runGets.length, 1, runGets.join("\n"));
+    assert.ok(runGets[0].endsWith(`/runs/${fx.archivedRunsByRepo["acme-labs/web-console"][0].id}`));
+    // 何度表示し直しても、同じ実行は読み直さない
+    await page.getByRole("tab", { name: "Workflows" }).click();
+    await page.getByRole("tab", { name: "Artifacts" }).click();
+    await web.getByText("dist-bundle").waitFor();
+    assert.equal(log.slice(before).filter((l) => /^GET \/repos\/acme-labs\/web-console\/actions\/runs\/\d+$/.test(l)).length, 1);
+
+    await web.getByRole("button", { name: "Download playwright-report" }).click();
+    await page.getByText(/Started downloading playwright-report\.|Download of playwright-report failed/).waitFor();
+    const [sw] = context.serviceWorkers();
+    await page.waitForTimeout(1500);
+    const items = await sw.evaluate(() => chrome.downloads.search({ orderBy: ["-startTime"] }));
+    assert.match(items[0].url, /\/repos\/acme-labs\/web-console\/actions\/artifacts\/\d+\/zip$/);
+    await page.getByRole("tab", { name: "Workflows" }).click();
   });
 
   await step("キャッシュ: 全リポジトリのキャッシュを一覧し、PR のキャッシュをまとめて消す", async () => {

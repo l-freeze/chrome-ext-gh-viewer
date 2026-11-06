@@ -1,9 +1,9 @@
 import { settleEach } from "../../../lib/concurrency";
 import { toRepoRef, type Repository } from "../../workspace/repository";
 import type { ActionsOperations, ActionsSource } from "../ports";
-import { latestRunByWorkflow, type WorkflowRun } from "../workflow";
+import { latestRunByWorkflow, runsByWorkflow, type WorkflowRun } from "../workflow";
 
-/** ワークフローの一覧を取り、ワークフローがあれば最近の実行から最新のものを付ける */
+/** ワークフローの一覧を取り、ワークフローがあれば最近の実行（1 ページ分）と、その中の最新のものを付ける */
 export function createListWorkflows(source: ActionsSource): ActionsOperations["list"] {
   return (repos, options = {}) =>
     settleEach(
@@ -11,8 +11,10 @@ export function createListWorkflows(source: ActionsSource): ActionsOperations["l
       async (repo, signal) => {
         const ref = toRepoRef(repo);
         const workflows = await source.listWorkflows(ref, signal);
-        const latest = workflows.length > 0 ? latestRunByWorkflow(await source.listRecentRuns(ref, signal)) : new Map<number, WorkflowRun>();
-        return workflows.map((workflow) => ({ workflow, lastRun: latest.get(workflow.id) ?? null }));
+        const runs: WorkflowRun[] = workflows.length > 0 ? await source.listRecentRuns(ref, signal) : [];
+        const latest = latestRunByWorkflow(runs);
+        const byWorkflow = runsByWorkflow(runs);
+        return workflows.map((workflow) => ({ workflow, lastRun: latest.get(workflow.id) ?? null, recentRuns: byWorkflow.get(workflow.id) ?? [] }));
       },
       { concurrency: 6, ...options },
     );
