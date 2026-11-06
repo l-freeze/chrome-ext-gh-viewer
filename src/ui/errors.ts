@@ -57,3 +57,11 @@ export function isUnauthorized(e: unknown): boolean {
 export function ssoUrlOf(error: unknown): string | null {
   return error instanceof GitHubApiError ? (error.ssoUrl ?? null) : null;
 }
+
+/** chrome.downloads の中断理由（SERVER_UNAUTHORIZED など）を利用者向けの文にする */
+export function downloadFailureText(t: Translate, reason: string): string {
+  if (reason === "SERVER_UNAUTHORIZED") return t("error.unauthorized");
+  if (reason === "SERVER_FORBIDDEN") return t("error.forbidden");
+  if (reason.startsWith("NETWORK_")) return t("error.network");
+  return reason;
+}

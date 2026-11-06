@@ -203,9 +203,38 @@ const step = async (name, fn) => {
     assert.match(page.url(), /#issues$/);
   });
 
+  await step("Releases: リポジトリごとに新しい順に並べ、添付ファイルをダウンロードできる", async () => {
+    const before = log.length;
+    await page.getByRole("link", { name: /^Releases/ }).click();
+    const table = page.locator("table.table--releases");
+    await table.getByRole("link", { name: "master build" }).waitFor();
+    assert.equal(await table.locator(".group-row").count(), 2);
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 4);
+    // 名前のない Release はタグ名で出す
+    await table.getByRole("link", { name: "v2.3.0", exact: true }).waitFor();
+    await table.locator("tr", { hasText: "master build" }).getByText("Pre-release").waitFor();
+    await page.getByText("1 repository could not be read").waitFor();
+    await page.screenshot({ path: path.join(OUT, "06f-releases.png") });
+
+    await page.getByRole("radio", { name: "Pre-releases" }).click();
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 2);
+    await page.getByRole("radio", { name: "All" }).click();
+
+    await table.getByRole("button", { name: "Download chrome-extension.zip" }).click();
+    await page.getByText(/Started downloading chrome-extension.zip\.|Download of chrome-extension.zip failed/).waitFor();
+    const [sw] = context.serviceWorkers();
+    await page.waitForTimeout(1500);
+    const items = await sw.evaluate(() => chrome.downloads.search({ orderBy: ["-startTime"] }));
+    assert.match(items[0].url, /\/repos\/acme-labs\/web-console\/releases\/assets\/\d+$/);
+    // リポジトリごとに 1 回だけ読む。書き込みの呼び出しはしない
+    const requests = log.slice(before).filter((l) => l.includes("/releases"));
+    assert.equal(requests.filter((l) => l.startsWith("GET /repos/acme-labs/web-console/releases")).length, 1);
+    assert.ok(requests.every((l) => l.startsWith("GET ")), requests.join("\n"));
+  });
+
   await step("シークレットと変数: リポジトリと Environment の分を、リポジトリごとに閲覧だけできる", async () => {
     const before = log.length;
-    await page.getByRole("link", { name: /^Secrets & variables/ }).click();
+    await page.getByRole("link", { name: /^Secrets & Variables/ }).click();
     const table = page.locator("table.table--secrets");
     await table.getByText("DEPLOY_KEY").waitFor();
     assert.equal(await table.locator(".group-row").count(), 2);

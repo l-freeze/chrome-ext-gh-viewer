@@ -14,6 +14,8 @@ import { IssuesScreen } from "../screens/issues/IssuesScreen";
 import { KanbanScreen } from "../screens/kanban/KanbanScreen";
 import { createKanbanState } from "../screens/kanban/state";
 import { createIssuesState } from "../screens/issues/state";
+import { ReleasesScreen } from "../screens/releases/ReleasesScreen";
+import { createReleasesState } from "../screens/releases/state";
 import { SecretsScreen } from "../screens/secrets/SecretsScreen";
 import { createSecretsState } from "../screens/secrets/state";
 import { SettingsScreen } from "../screens/settings/SettingsScreen";
@@ -54,15 +56,17 @@ export function App(props: { deps: UiDeps }) {
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const kanban = createKanbanState(deps, ws, () => route() === "kanban");
   const secrets = createSecretsState(deps, ws, () => route() === "secrets");
+  const releases = createReleasesState(deps, ws, () => route() === "releases");
   const connected = () => settings.active().length > 0;
 
   // 画面ごとの自動更新。リポジトリごとに呼ぶ画面は、選んでいるリポジトリの数から間隔を決める
-  // （アーティファクト・キャッシュは 1 リポジトリ 1 回、Actions はワークフローと実行履歴で 2 回）
+  // （アーティファクト・キャッシュ・Releases は 1 リポジトリ 1 回、Actions はワークフローと実行履歴で 2 回）
   const repoCount = () => ws.selectedRepos().length;
   const refreshPlans: Array<{ route: Route; intervalMs: () => number; run: () => Promise<void> }> = [
     { route: "artifacts", intervalMs: () => intervalForRequests(repoCount()), run: artifacts.results.poll },
     { route: "caches", intervalMs: () => intervalForRequests(repoCount()), run: caches.results.poll },
     { route: "actions", intervalMs: () => intervalForRequests(2 * repoCount()), run: workflows.results.poll },
+    { route: "releases", intervalMs: () => intervalForRequests(repoCount()), run: releases.results.poll },
     { route: "issues", intervalMs: () => ISSUES_REFRESH_MS, run: issues.poll },
     { route: "kanban", intervalMs: () => KANBAN_REFRESH_MS, run: kanban.poll },
     { route: "secrets", intervalMs: () => SECRETS_REFRESH_MS, run: secrets.results.poll },
@@ -85,6 +89,8 @@ export function App(props: { deps: UiDeps }) {
         return { progress: issues.progress(), refresh: issues.refresh };
       case "kanban":
         return { progress: kanban.progress(), refresh: kanban.refresh };
+      case "releases":
+        return { progress: releases.results.progress(), refresh: releases.results.refresh };
       case "secrets":
         return { progress: secrets.results.progress(), refresh: secrets.results.refresh };
       default:
@@ -103,6 +109,7 @@ export function App(props: { deps: UiDeps }) {
           caches: () => caches.caches().length,
           actions: workflows.total,
           issues: () => issues.issues().length,
+          releases: () => releases.releases().length,
           secrets: () => secrets.items().length,
         }}
         progress={current().progress}
@@ -154,6 +161,9 @@ export function App(props: { deps: UiDeps }) {
                 </Match>
                 <Match when={route() === "kanban"}>
                   <KanbanScreen state={kanban} />
+                </Match>
+                <Match when={route() === "releases"}>
+                  <ReleasesScreen state={releases} />
                 </Match>
                 <Match when={route() === "secrets"}>
                   <SecretsScreen state={secrets} />

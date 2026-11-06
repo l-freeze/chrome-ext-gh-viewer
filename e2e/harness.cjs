@@ -83,6 +83,12 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       deletes.push(`run ${m[3]}`);
       return route.fulfill({ status: 204 });
     }
+    m = /^\/repos\/([^/]+)\/([^/]+)\/releases$/.exec(p);
+    if (m) {
+      const key = `${m[1]}/${m[2]}`;
+      if (key === "locked-corp/secret-service") return json(route, { message: "Forbidden" }, 403);
+      return json(route, fx.releasesByRepo[key] ?? []);
+    }
     m = /^\/repos\/([^/]+)\/([^/]+)\/(?:environments\/([^/]+)|actions)\/(secrets|variables)$/.exec(p);
     if (m) {
       const key = `${m[1]}/${m[2]}`;

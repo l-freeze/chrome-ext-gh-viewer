@@ -7,7 +7,7 @@ import type { WorkspaceState } from "../../app/workspace";
 import { Failures } from "../../components/Failures";
 import { Icon } from "../../components/Icon";
 import { PermissionHint } from "../../components/PermissionHint";
-import { errorText } from "../../errors";
+import { downloadFailureText, errorText } from "../../errors";
 import { formatBytes, formatDate, formatPercent } from "../../format";
 import { BulkBar } from "../../lists/BulkBar";
 import { SelectAll } from "../../lists/SelectAll";
@@ -172,14 +172,6 @@ export function ArtifactsScreen(props: { state: ArtifactsState; ws: WorkspaceSta
     );
   }
 
-  /** chrome.downloads の中断理由（SERVER_UNAUTHORIZED など）を利用者向けの文にする */
-  function downloadReason(reason: string): string {
-    if (reason === "SERVER_UNAUTHORIZED") return t("error.unauthorized");
-    if (reason === "SERVER_FORBIDDEN") return t("error.forbidden");
-    if (reason.startsWith("NETWORK_")) return t("error.network");
-    return reason;
-  }
-
   function Bar() {
     const sel = () => s.selectionSummary();
     const del = () => s.bulkDelete.state();
@@ -194,7 +186,7 @@ export function ArtifactsScreen(props: { state: ArtifactsState; ws: WorkspaceSta
         case "downloadStarted":
           return t("artifacts.downloadStarted", { count: n.count });
         case "downloadFailed":
-          return t("artifacts.downloadFailed", { name: n.name, reason: downloadReason(n.reason) });
+          return t("artifacts.downloadFailed", { name: n.name, reason: downloadFailureText(t, n.reason) });
         case "error":
           return errorText(t, n.error);
       }
