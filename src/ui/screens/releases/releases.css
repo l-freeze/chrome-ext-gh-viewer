@@ -1,0 +1,87 @@
+/* ---- Releases ------------------------------------------------------------ */
+
+.releases__count {
+  margin: 0 0 0 auto;
+}
+.releases .notice {
+  justify-content: space-between;
+}
+.table--releases td {
+  vertical-align: top;
+  padding-top: 8px !important;
+  padding-bottom: 8px !important;
+}
+.cell-release {
+  min-width: 240px;
+  white-space: normal !important;
+}
+.release__title {
+  color: var(--text);
+  font-weight: 600;
+}
+.release__meta {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 8px;
+  margin-top: 2px;
+  color: var(--text-3);
+}
+.release__author {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+}
+.cell-assets {
+  white-space: normal !important;
+}
+.assets {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.asset {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  max-width: 100%;
+  padding: 2px 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  color: var(--text);
+  font: inherit;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+}
+.asset:hover {
+  border-color: var(--accent);
+  color: var(--accent);
+}
+.asset__name {
+  font-family: var(--mono);
+  overflow-wrap: anywhere;
+}
+.asset__meta {
+  flex: none;
+  color: var(--text-3);
+  font-size: 12px;
+}
+
+/* リポジトリごとの見出しの行（Issues の一覧と同じ見た目。そちらの CSS には依存しない） */
+.table--releases .group-row th {
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.table--releases .group-row a {
+  color: var(--text);
+}
+.table--releases .group-row__count {
+  margin-left: 8px;
+  font-weight: 400;
+  color: var(--text-3);
+}

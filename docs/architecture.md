@@ -13,6 +13,7 @@ src/
 │   ├── artifacts/            アーティファクト
 │   ├── caches/               Actions のキャッシュ
 │   ├── actions/              ワークフロー一覧・手動実行・実行履歴の整理
+│   ├── releases/             Release の一覧と添付ファイルのダウンロード（閲覧のみ）
 │   ├── secrets/              Actions のシークレットと変数の一覧（閲覧のみ）
 │   ├── issues/               Issue の横断検索（Issue タブの List）
 │   ├── preferences/          画面をまたぐ表示の好み（自動更新のオン・オフ）

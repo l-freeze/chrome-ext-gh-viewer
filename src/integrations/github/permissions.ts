@@ -16,6 +16,7 @@ export type GitHubOperation =
   | "runs.list"
   | "runs.delete"
   | "secrets.list"
+  | "releases.list"
   | "projects.list"
   | "projects.move";
 
@@ -39,6 +40,7 @@ const REQUIREMENTS: Record<GitHubOperation, Requirement> = {
   "caches.delete": { fineGrained: ["actions=write"], classic: ["repo"] },
   "runs.list": { fineGrained: ["actions=read"], classic: ["repo"] },
   "runs.delete": { fineGrained: ["actions=write"], classic: ["repo"] },
+  "releases.list": { fineGrained: ["contents=read"], classic: ["repo"] },
   // Environment の一覧と、その Secrets・Variables も読む
   "secrets.list": { fineGrained: ["secrets=read", "variables=read", "environments=read"], classic: ["repo"] },
   // Fine-grained PAT の Projects 権限は Organization の権限

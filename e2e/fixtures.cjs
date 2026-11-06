@@ -231,7 +231,26 @@ const configByRepo = {
   "octo-dev/tile-game": { secrets: [secretOrVariable("ITCH_API_KEY")], variables: [], environments: {} },
 };
 
+// Releases。web-console には master のビルドを置くプレリリースと、正式な Release がある
+let releaseId = 4000;
+const releaseOf = (tag, name, ageDays, { prerelease = false, assets = [] } = {}) => ({
+  id: releaseId++, name, tag_name: tag, draft: false, prerelease, created_at: iso(ageDays), published_at: iso(ageDays),
+  html_url: `https://github.com/acme-labs/web-console/releases/tag/${tag}`, author: viewer,
+  assets: assets.map(([assetName, size, downloads]) => ({
+    id: releaseId++, name: assetName, size, download_count: downloads, content_type: "application/zip", updated_at: iso(ageDays),
+  })),
+});
+const releasesByRepo = {
+  "acme-labs/web-console": [
+    releaseOf("master-build", "master build", 0, { prerelease: true, assets: [["chrome-extension.zip", 95341, 12]] }),
+    releaseOf("v2.4.0", "v2.4.0", 20, { assets: [["web-console-2.4.0.tar.gz", 4.2 * MB, 87], ["checksums.txt", 210, 40]] }),
+    releaseOf("v2.3.0", "", 60),
+  ],
+  "octo-dev/tile-game": [releaseOf("v0.9.0", "Beta", 5, { prerelease: true, assets: [["tile-game-web.zip", 18 * MB, 4]] })],
+};
+
 module.exports = {
+  releasesByRepo,
   configByRepo,
   viewer, orgs, repos, artifactsByRepo, issuesByOwner, workflowsByRepo, runsByRepo, workflowYaml, cachesByRepo, oldRunsByRepo,
   projectsByOwner, statusFieldByProject, projectItems,

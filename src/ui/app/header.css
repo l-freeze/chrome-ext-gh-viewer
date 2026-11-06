@@ -300,8 +300,14 @@
   .tab {
     padding: 0 8px;
   }
-  .meter,
   .switch__label {
+    display: none;
+  }
+}
+
+/* 容量のメーターは、1 行目に収まらない幅で隠す */
+@media (max-width: 760px) {
+  .meter {
     display: none;
   }
 }
