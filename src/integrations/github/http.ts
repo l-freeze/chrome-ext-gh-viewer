@@ -1,7 +1,7 @@
 // GitHub REST API への呼び出しの共通部分: 送り先の制限、認証ヘッダー、レート制限を見た再試行、
 // ページ送り、エラーの分類。送信そのものは infrastructure/http に任せる。
 
-import { createHttpClient, parseNextLink, retryAfterSeconds, TransportError, type HttpClient } from "../../infrastructure/http";
+import { createHttpClient, parseNextLink, retryAfterMs, TransportError, type HttpClient } from "../../infrastructure/http";
 import type { Sleep } from "../../lib/time";
 import {
   GitHubApiError,
@@ -117,7 +117,7 @@ export class GitHubHttp {
       response = await this.client.send(
         { url, method, headers, ...(body !== undefined ? { body } : {}), ...(options.signal ? { signal: options.signal } : {}) },
         {
-          onResponse: async (res, attempt) => {
+          onResponse: async (res, { attempt }) => {
             const rateLimit = parseRateLimit(res.headers);
             if (rateLimit) {
               this.lastRateLimit = rateLimit;
@@ -126,7 +126,7 @@ export class GitHubHttp {
             if (res.ok) return null;
             return this.retryWaitMs(await toApiError(res.clone(), url, rateLimit, this.now()), method, attempt);
           },
-          onError: (error, attempt) =>
+          onError: (error, { attempt }) =>
             this.retryWaitMs(new GitHubApiError({ kind: "network", message: error.message }), method, attempt),
         },
       );
@@ -229,7 +229,8 @@ async function toApiError(res: Response, url: string, rateLimit: RateLimit | nul
   };
 
   if (status === 403 || status === 429) {
-    const retryAfter = retryAfterSeconds(res.headers);
+    const retryAfterWait = retryAfterMs(res.headers, nowMs);
+    const retryAfter = retryAfterWait === null ? null : Math.ceil(retryAfterWait / 1000);
     if (rateLimit && rateLimit.remaining === 0) {
       const sec = Math.max(0, Math.ceil(rateLimit.reset - nowMs / 1000));
       return new GitHubApiError({ ...base, kind: "rate_limited", retryAfterSec: sec });
