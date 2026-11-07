@@ -104,7 +104,7 @@ export class GitHubHttp {
   /**
    * ダウンロード用の API（GitHub が署名つきの保存先 URL へ転送するもの）を呼び、転送先の URL を返す。
    * トークンは API への最初のリクエストにだけ付く: fetch は別のオリジンへ転送するとき Authorization を外す
-   * （Fetch Standard。Chrome 119 以降）。転送先の本文は受け取らずに閉じる。
+   * （Fetch Standard。manifest の minimum_chrome_version で、その動きを確かめた版以降に限っている）。転送先の本文は受け取らずに閉じる。
    * 転送先で CORS の確認が要らないよう、ヘッダーは Accept と Authorization だけにする
    */
   async downloadUrl(pathOrUrl: string, accept: string, signal?: AbortSignal): Promise<string> {
