@@ -50,7 +50,7 @@ Fine-grained の Contents: Read はワークフローの定義とブランチを
 
 トークンは `chrome.storage.local` にだけ保存され、`github.com` と `api.github.com` 以外には送信されません。
 
-アーティファクトと Release の添付ファイルは、GitHub の API が署名つきの保存先 URL（Azure の Blob や `release-assets.githubusercontent.com`）へ転送します。拡張機能はトークンを付けて API に頼み、転送先の URL だけを受け取ってから、その URL をトークンなしで Chrome のダウンロードに渡します。別のドメインへ転送するときに Authorization ヘッダーを外すブラウザの仕様（Chrome 119 以降）を使うので、Chrome 119 以上が必要です。
+アーティファクトと Release の添付ファイルは、GitHub の API が署名つきの保存先 URL（Azure の Blob や `release-assets.githubusercontent.com`）へ転送します。拡張機能はトークンを付けて API に頼み、転送先の URL だけを受け取ってから、その URL をトークンなしで Chrome のダウンロードに渡します。別のドメインへ転送するときに Authorization ヘッダーを外すブラウザの仕様を使います。その動きを確かめた Chrome 153 以上が必要です。
 
 拡張機能のページには、`connect-src` を GitHub と上の保存先に限る CSP を設定しています。
 

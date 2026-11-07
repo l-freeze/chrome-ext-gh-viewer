@@ -15,8 +15,8 @@ export default defineConfig({
     name: "__MSG_extName__",
     description: "__MSG_extDescription__",
     default_locale: "en",
-    // 別のオリジンへの転送で Authorization を外す fetch（Chrome 119）に頼るため。AbortSignal.any（Chrome 116）も使う
-    minimum_chrome_version: "119",
+    // 別のオリジンへの転送で Authorization を外す fetch に頼るため、その動きを確かめた版（Chromium 153）を下限にする
+    minimum_chrome_version: "153",
     permissions: ["storage", "downloads"],
     host_permissions: CONNECT_SRC.map((origin) => `${origin}/*`),
     action: { default_title: "__MSG_extName__" },
