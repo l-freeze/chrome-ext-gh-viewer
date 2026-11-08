@@ -21,7 +21,9 @@ async function startStorage() {
   const requests = [];
   const server = https.createServer({ key: fs.readFileSync(path.join(dir, "key.pem")), cert: fs.readFileSync(path.join(dir, "cert.pem")) }, (req, res) => {
     requests.push({ method: req.method, host: req.headers.host, path: req.url, authorization: req.headers.authorization ?? null });
-    const cors = { "access-control-allow-origin": "*" };
+    // 本物の Release の保存先と同じく、転送のあとの Origin: null には CORS の許可を返さない
+    // （拡張機能が保存先への権限を持っていないと読めない）
+    const cors = req.headers.origin && req.headers.origin !== "null" ? { "access-control-allow-origin": "*" } : {};
     if (req.method === "OPTIONS") return res.writeHead(204, { ...cors, "access-control-allow-methods": "GET" }).end();
     if (!req.url.includes("sig=")) return res.writeHead(403, { ...cors, "content-type": "application/xml" }).end("<Error><Code>AuthenticationFailed</Code></Error>");
     res.writeHead(200, { ...cors, "content-type": "application/zip", "content-length": ZIP_BYTES.length }).end(ZIP_BYTES);
