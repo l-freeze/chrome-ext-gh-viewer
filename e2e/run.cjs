@@ -149,7 +149,11 @@ const step = async (name, fn) => {
   await step("カンバン: プロジェクトごとに Status の列で並べ、閉じたプロジェクトとアーカイブ済みの項目は出さない", async () => {
     assert.equal(await page.locator(".board").count(), 3);
     assert.equal(await page.getByRole("button", { name: /Design system 2024/ }).count(), 0);
-    await page.getByText("Projects of 1 owner could not be loaded").waitFor();
+    await page.getByText("Projects of 1 owner could not be loaded").click();
+    // Organization のプロジェクトは、Fine-grained PAT の Organization permissions の Projects か、Classic PAT の read:project を案内する
+    await page.locator(".failures").getByText(/with locked-corp as the resource owner, Organization permissions → Projects: Read-only/).waitFor();
+    await page.locator(".failures").getByText("Classic token: the read:project scope (project to move cards)").waitFor();
+    await page.getByText("Projects of 1 owner could not be loaded").click();
     assert.equal(await kanbanColumn("Platform roadmap", "Todo").locator(".card").count(), 2);
     assert.equal(await kanbanColumn("Platform roadmap", "No Status").locator(".card").count(), 1);
     // 既定では PR を出さない
@@ -190,11 +194,25 @@ const step = async (name, fn) => {
     control.failMoves = true;
     await page.locator(".card", { hasText: "Null partitions" }).dragTo(kanbanColumn("Platform roadmap", "Done"), { targetPosition: { x: 100, y: 12 } });
     await page.getByText(/Could not move “Null partitions break the nightly parquet export”/).waitFor();
-    await page.locator(".notice--error").getByText("Organization projects").waitFor();
+    await page.locator(".notice--error").getByText(/with acme-labs as the resource owner, Organization permissions → Projects: Read and write/).waitFor();
     await kanbanColumn("Platform roadmap", "In progress").locator(".card", { hasText: "Null partitions" }).waitFor();
     await page.screenshot({ path: path.join(OUT, "06d-kanban-move-failed.png") });
     control.failMoves = false;
     await page.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("カンバン: 個人アカウントのプロジェクトは Fine-grained PAT では読めないことと、Classic PAT が要ることを示す", async () => {
+    control.failUserProjects = true;
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await page.getByText("Projects of 2 owners could not be loaded").click();
+    const failures = page.locator(".failures");
+    await failures.getByText("Fine-grained tokens cannot read projects owned by a personal account (GitHub does not support it).").waitFor();
+    await failures.getByText("To show them, add a classic token.").waitFor();
+    await failures.getByRole("link", { name: /Create a classic token/ }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "06g-kanban-personal-projects.png") });
+    control.failUserProjects = false;
+    await page.getByRole("button", { name: "Refresh" }).click();
+    await page.getByText("Projects of 1 owner could not be loaded").waitFor();
   });
 
   await step("カンバン: 折りたたんだプロジェクトは覚えておき、開くまで項目を取得しない", async () => {

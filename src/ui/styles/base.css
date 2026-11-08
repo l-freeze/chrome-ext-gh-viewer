@@ -202,12 +202,13 @@ h2 {
   padding: 8px 12px;
   cursor: pointer;
 }
-.failures ul {
+.failures > ul {
   margin: 0;
   padding: 0 12px 10px 36px;
   color: var(--text-2);
 }
-.failures li {
+/* 読み込めなかった項目の行だけ。中の権限の案内の箇条書きには効かせない */
+.failures > ul > li {
   display: flex;
   flex-wrap: wrap;
   gap: 4px 12px;

@@ -5,7 +5,7 @@ import { useUi } from "../../app/context";
 import { Avatar } from "../../components/Avatar";
 import { Failures } from "../../components/Failures";
 import { Icon } from "../../components/Icon";
-import { PermissionHint } from "../../components/PermissionHint";
+import { ProjectAccessHint } from "./ProjectAccessHint";
 import { errorText } from "../../errors";
 import { labelTextColor } from "../../format";
 import "./kanban.css";
@@ -69,14 +69,17 @@ export function KanbanScreen(props: { state: KanbanState }) {
       <Failures
         title={t("kanban.failures", { count: s.failures().length })}
         items={s.failures().map((f) => ({ key: f.owner.login, label: f.owner.login, error: f.error }))}
-        operation="projects.list"
+        hint={(item) => {
+          const owner = s.failures().find((f) => f.owner.login === item.key)?.owner;
+          return owner ? <ProjectAccessHint error={item.error} owner={owner} action="read" /> : null;
+        }}
       />
       <Show when={s.moveFailure()}>
         {(f) => (
           <div class="notice notice--error" role="alert">
             <div>
               <p>{t("kanban.moveFailed", { title: f().title, reason: errorText(t, f().error) })}</p>
-              <PermissionHint error={f().error} operation="projects.move" />
+              <ProjectAccessHint error={f().error} owner={f().owner} action="move" />
             </div>
             <button type="button" class="button button--ghost" onClick={() => s.dismissMoveFailure()}>
               {t("action.close")}
@@ -133,7 +136,7 @@ export function KanbanScreen(props: { state: KanbanState }) {
                         e.status === "error" && (
                           <div class="board__message">
                             <p class="error">{errorText(t, e.error)}</p>
-                            <PermissionHint error={e.error} operation="projects.list" />
+                            <ProjectAccessHint error={e.error} owner={project.owner} action="read" />
                           </div>
                         )
                       }

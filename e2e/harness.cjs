@@ -193,6 +193,8 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       const [, , owner, number, part, itemIdText] = m;
       if (owner === "locked-corp")
         return json(route, { message: "Your token has not been granted the required scopes to execute this query." }, 403, { "x-accepted-oauth-scopes": "read:project" });
+      // Fine-grained PAT で個人アカウントのプロジェクトを読もうとしたときの再現（GitHub は必要な権限を返さない）
+      if (control.failUserProjects && m[1] === "users") return json(route, { message: "Resource not accessible by personal access token" }, 403);
       if (!number) return json(route, fx.projectsByOwner[owner] ?? []);
       const key = `${owner}/${number}`;
       const field = fx.statusFieldByProject[key];
@@ -285,6 +287,7 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     dispatchedRuns: [],
     hideRunGets: 0,
     failMoves: false,
+    failUserProjects: false,
     completeAllRuns() {
       for (const list of Object.values(this.runs))
         for (const run of list) if (run.status !== "completed") Object.assign(run, { status: "completed", conclusion: "success" });

@@ -70,11 +70,16 @@ export function permissionHint(error: GitHubApiError, operation: GitHubOperation
 
 export type PermissionLevel = "read" | "write" | "admin";
 
+/** トークンの作成画面での名前が、権限の名前から作る名前と違うもの */
+const PERMISSION_NAMES: Record<string, string> = {
+  organization_projects: "Projects (Organization permissions)",
+};
+
 /** "pull_requests=write" → { name: "Pull requests", level: "write" } */
 export function describePermission(permission: string): { name: string; level: PermissionLevel } {
   const [rawName = "", rawLevel = "read"] = permission.split("=");
   const words = rawName.split("_").filter(Boolean);
-  const name = words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(" ");
+  const name = PERMISSION_NAMES[rawName] ?? words.map((w, i) => (i === 0 ? w.charAt(0).toUpperCase() + w.slice(1) : w)).join(" ");
   const level: PermissionLevel = rawLevel === "write" || rawLevel === "admin" ? rawLevel : "read";
   return { name, level };
 }

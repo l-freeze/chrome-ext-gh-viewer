@@ -291,3 +291,8 @@
     flex-basis: 240px;
   }
 }
+
+/* 権限の案内は、読み込めなかった所有者の行の下に全幅で出す */
+.failures .project-access {
+  flex-basis: 100%;
+}

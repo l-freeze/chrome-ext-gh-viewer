@@ -68,5 +68,7 @@ describe("permissionHint", () => {
   it("権限名を画面の表記にする", () => {
     expect(describePermission("contents=read")).toEqual({ name: "Contents", level: "read" });
     expect(describePermission("pull_requests=write")).toEqual({ name: "Pull requests", level: "write" });
+    // トークンの作成画面と同じ名前と場所で示す
+    expect(describePermission("organization_projects=read")).toEqual({ name: "Projects (Organization permissions)", level: "read" });
   });
 });
