@@ -18,6 +18,8 @@ export type BoardEntry = { status: "loading" } | { status: "ready"; board: Board
 export interface MoveFailure {
   title: string;
   error: unknown;
+  /** 動かそうとしたプロジェクトの持ち主（権限の案内を出し分けるため） */
+  owner: Project["owner"];
 }
 
 const BOARD_CONCURRENCY = 4;
@@ -175,7 +177,7 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
         if (current?.status === "ready" && current.board.items.find((i) => i.id === itemId)?.statusId === statusId) {
           setBoard(key, { status: "ready", board: withItemStatus(current.board, itemId, before) });
         }
-        setMoveFailure({ title: item.title ?? `#${itemId}`, error });
+        setMoveFailure({ title: item.title ?? `#${itemId}`, error, owner: project.owner });
       });
     } finally {
       setMoving((prev) => {

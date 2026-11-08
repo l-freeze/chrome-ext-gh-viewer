@@ -1,4 +1,4 @@
-import { For, Show } from "solid-js";
+import { For, Show, type JSX } from "solid-js";
 import type { GitHubOperation } from "../../integrations/github/permissions";
 import { useUi } from "../app/context";
 import { errorText, ssoUrlOf } from "../errors";
@@ -12,7 +12,8 @@ export interface FailureItem {
 }
 
 /** 読み込めなかったリポジトリ・所有者の一覧。理由ごとの対処も示す */
-export function Failures(props: { title: string; items: FailureItem[]; operation?: GitHubOperation }) {
+/** hint を渡すと、operation から作る権限の案内の代わりに、項目ごとの案内を出す */
+export function Failures(props: { title: string; items: FailureItem[]; operation?: GitHubOperation; hint?: (item: FailureItem) => JSX.Element }) {
   const { i18n } = useUi();
   return (
     <Show when={props.items.length > 0}>
@@ -34,7 +35,9 @@ export function Failures(props: { title: string; items: FailureItem[]; operation
                     </a>
                   )}
                 </Show>
-                <Show when={props.operation}>{(op) => <PermissionHint error={item.error} operation={op()} />}</Show>
+                <Show when={props.hint} fallback={<Show when={props.operation}>{(op) => <PermissionHint error={item.error} operation={op()} />}</Show>}>
+                  {(hint) => hint()(item)}
+                </Show>
               </li>
             )}
           </For>
