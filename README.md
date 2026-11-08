@@ -52,7 +52,7 @@ Fine-grained の Contents: Read はワークフローの定義とブランチを
 
 アーティファクトと Release の添付ファイルは、GitHub の API が署名つきの保存先 URL（Azure の Blob や `release-assets.githubusercontent.com`）へ転送します。拡張機能はトークンを付けて API に頼み、転送先の URL だけを受け取ってから、その URL をトークンなしで Chrome のダウンロードに渡します。別のドメインへ転送するときに Authorization ヘッダーを外すブラウザの仕様を使います。その動きを確かめた Chrome 153 以上が必要です。
 
-拡張機能のページには、`connect-src` を GitHub と上の保存先に限る CSP を設定しています。
+拡張機能の権限（`host_permissions`）と、ページの CSP の `connect-src` は、GitHub と上の保存先に限っています。保存先への権限は、転送先の URL を読むために使います。転送のあとはブラウザが `Origin: null` を送り、保存先は CORS の許可を返さないためです。
 
 ## 開発
 

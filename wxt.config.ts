@@ -18,7 +18,9 @@ export default defineConfig({
     // 別のオリジンへの転送で Authorization を外す fetch に頼るため、その動きを確かめた版（Chromium 153）を下限にする
     minimum_chrome_version: "153",
     permissions: ["storage", "downloads"],
-    host_permissions: CONNECT_SRC.map((origin) => `${origin}/*`),
+    // 保存先にも権限を持たせる。転送のあとはブラウザが Origin: null を送り、保存先は CORS の許可を返さないため、
+    // 権限がないと転送先の URL を読めない（トークンは送らない）
+    host_permissions: [...CONNECT_SRC, ...DOWNLOAD_STORAGE].map((origin) => `${origin}/*`),
     action: { default_title: "__MSG_extName__" },
     // 開発サーバーは localhost と通信するため、CSP はビルド時だけ付ける
     ...(command === "build"
