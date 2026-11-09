@@ -102,7 +102,8 @@ ui/
 例: Issue タブの Kanban は、Projects という新しい API の分野とモデル（プロジェクト・列・項目）を扱うため、`features/projects` と `screens/kanban` を足しています。List（`features/issues` と `screens/issues`）とは独立しています。
 
 例: Secrets & Variables タブの Matrix（比較表）は、一覧と同じ取得結果を並べ直すだけなので、新しい機能は足していません。
-行列を組み立てる規則を `features/secrets/matrix.ts` に、画面を `screens/secrets/MatrixScreen.tsx` と `matrix-state.ts` に置き、一覧の `item.ts`・`state.ts`・`SecretsScreen.tsx` には依存させていません（取得結果だけを一覧の状態から受け取る）。
+行列を組み立てる規則を `features/secrets/matrix.ts` に、画面を `screens/secrets/MatrixScreen.tsx` と `matrix-state.ts` に置いています。
+一覧から使うのは、項目の型（`item.ts` の `ConfigItem` など）と、一覧の状態が持つ取得結果（`results`）だけです。一覧の画面と状態は変えていません。
 
 ### 自動更新
 
