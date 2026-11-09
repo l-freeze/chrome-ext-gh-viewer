@@ -226,3 +226,19 @@ export async function updateProjectItemField(
     body: { fields: [{ id: field.id, value: field.value }] },
   });
 }
+
+/** Issue か PR をプロジェクトに加え、加えた項目を返す（すでに入っていれば、その項目が返る） */
+export async function addProjectItem(
+  http: GitHubHttp,
+  project: ProjectPath,
+  content: { type: "Issue" | "PullRequest"; owner: string; repo: string; number: number },
+  call: Call = {},
+): Promise<GitHubProjectItem> {
+  const { data } = await http.json(`${projectPath(project)}/items`, { ...call, method: "POST", body: content });
+  return decode(() => readItem(data));
+}
+
+/** プロジェクトから項目を外す（Issue や PR そのものは消えない） */
+export async function deleteProjectItem(http: GitHubHttp, project: ProjectPath, itemId: number, call: Call = {}): Promise<void> {
+  await http.request(`${projectPath(project)}/items/${itemId}`, { ...call, method: "DELETE" });
+}

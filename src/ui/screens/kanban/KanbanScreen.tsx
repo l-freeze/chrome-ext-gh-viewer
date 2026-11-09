@@ -1,6 +1,6 @@
-import { createMemo, createSignal, For, Index, Match, Show, Switch } from "solid-js";
+import { createEffect, createMemo, createSignal, For, Index, Match, Show, Switch } from "solid-js";
 import { adjacentStatus, columnsOf, countVisible, type Board, type Column } from "../../../features/projects/board";
-import { ITEM_KINDS, projectKey, type Project, type ProjectItem } from "../../../features/projects/project";
+import { canMoveToAnotherProject, ITEM_KINDS, projectKey, type Project, type ProjectItem } from "../../../features/projects/project";
 import { useUi } from "../../app/context";
 import { Avatar } from "../../components/Avatar";
 import { Failures } from "../../components/Failures";
@@ -11,10 +11,12 @@ import { labelTextColor } from "../../format";
 import "./kanban.css";
 import type { KanbanState } from "./state";
 
-/** ドラッグ中のカード。動かせるのは同じプロジェクトの列の間だけ */
+/** ドラッグ中のカード。同じプロジェクトの列の間に加え、Issue と PR は別のプロジェクトへも落とせる（確認のあとで移す） */
 interface Dragging {
-  projectKey: string;
+  project: Project;
   itemId: number;
+  /** 別のプロジェクトへ移せるか（ドラフトは移せない） */
+  crossable: boolean;
 }
 
 const columnKey = (column: Column) => column.option?.id ?? "";
@@ -87,6 +89,7 @@ export function KanbanScreen(props: { state: KanbanState }) {
           </div>
         )}
       </Show>
+      <TransferDialog />
       <p class="visually-hidden" role="status">
         {announcement()}
       </p>
@@ -161,7 +164,11 @@ export function KanbanScreen(props: { state: KanbanState }) {
     const key = () => projectKey(p.board.project);
     const columns = createMemo(() => columnsOf(p.board, s.kinds()));
     const canMove = () => p.board.field !== null;
-    const accepts = () => dragging()?.projectKey === key() && canMove();
+    const accepts = () => {
+      const d = dragging();
+      if (!d) return false;
+      return projectKey(d.project) === key() ? canMove() : d.crossable;
+    };
 
     return (
       <>
@@ -191,8 +198,26 @@ export function KanbanScreen(props: { state: KanbanState }) {
                     e.preventDefault();
                     const d = accepts() ? dragging() : null;
                     endDrag();
-                    const item = d ? p.board.items.find((i) => i.id === d.itemId) : undefined;
-                    if (item) moveTo(p.board, item, column().option?.id ?? null);
+                    if (!d) return;
+                    const statusId = column().option?.id ?? null;
+                    if (projectKey(d.project) === key()) {
+                      const item = p.board.items.find((i) => i.id === d.itemId);
+                      if (item) moveTo(p.board, item, statusId);
+                      return;
+                    }
+                    // 別のプロジェクトへは、確認を出してから移す
+                    const source = s.board(d.project);
+                    const item = source?.status === "ready" ? source.board.items.find((i) => i.id === d.itemId) : undefined;
+                    if (item) {
+                      s.requestTransfer({
+                        from: d.project,
+                        to: p.board.project,
+                        itemId: item.id,
+                        title: item.title ?? `#${item.id}`,
+                        statusId,
+                        column: columnName(p.board, column()),
+                      });
+                    }
                   }}
                 >
                   <div class="column__head" title={column().option?.description ?? undefined}>
@@ -223,7 +248,7 @@ export function KanbanScreen(props: { state: KanbanState }) {
         class="card"
         classList={{
           "card--moving": s.isMoving(project(), p.item.id),
-          "card--dragging": dragging()?.itemId === p.item.id && dragging()?.projectKey === projectKey(project()),
+          "card--dragging": dragging()?.itemId === p.item.id && dragging()?.project !== undefined && projectKey(dragging()!.project) === projectKey(project()),
         }}
         draggable={movable()}
         tabIndex={p.canMove ? 0 : undefined}
@@ -232,7 +257,7 @@ export function KanbanScreen(props: { state: KanbanState }) {
           if (!movable()) return e.preventDefault();
           e.dataTransfer?.setData("text/plain", String(p.item.id));
           if (e.dataTransfer) e.dataTransfer.effectAllowed = "move";
-          setDragging({ projectKey: projectKey(project()), itemId: p.item.id });
+          setDragging({ project: project(), itemId: p.item.id, crossable: canMoveToAnotherProject(p.item) });
         }}
         onDragEnd={endDrag}
         onKeyDown={(e) => {
@@ -292,4 +317,43 @@ export function KanbanScreen(props: { state: KanbanState }) {
       </li>
     );
   }
+
+  /** 別のプロジェクトへ移す前の確認 */
+  function TransferDialog() {
+    let dialog!: HTMLDialogElement;
+    createEffect(() => {
+      const open = s.pendingTransfer() !== null;
+      if (open && !dialog.open) dialog.showModal();
+      if (!open && dialog.open) dialog.close();
+    });
+    return (
+      <dialog ref={dialog} class="transfer-dialog" aria-labelledby="transfer-title" onClose={() => s.cancelTransfer()}>
+        <Show when={s.pendingTransfer()}>
+          {(p) => (
+            <>
+              <h2 id="transfer-title">{t("kanban.transfer.title")}</h2>
+              <p>
+                {t("kanban.transfer.body", {
+                  title: p().title,
+                  from: `${p().from.owner.login} / ${p().from.title}`,
+                  to: `${p().to.owner.login} / ${p().to.title}`,
+                  column: p().column,
+                })}
+              </p>
+              <p class="muted small">{t("kanban.transfer.note")}</p>
+              <div class="transfer-dialog__actions">
+                <button type="button" class="button" onClick={() => s.cancelTransfer()}>
+                  {t("action.cancel")}
+                </button>
+                <button type="button" class="button button--primary" onClick={() => void s.confirmTransfer()}>
+                  {t("kanban.transfer.confirm")}
+                </button>
+              </div>
+            </>
+          )}
+        </Show>
+      </dialog>
+    );
+  }
+
 }

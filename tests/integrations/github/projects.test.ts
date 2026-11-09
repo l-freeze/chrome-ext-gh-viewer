@@ -1,5 +1,7 @@
 import { describe, expect, it } from "vitest";
 import {
+  addProjectItem,
+  deleteProjectItem,
   listOwnerProjects,
   listProjectItems,
   readItem,
@@ -58,6 +60,22 @@ describe("Projects API", () => {
 
   it("知らない種類の項目は形の誤りとして扱う", () => {
     expect(() => readItem({ id: 1, content_type: "Note", archived_at: null, updated_at: "x" })).toThrow(/content_type/);
+  });
+
+  it("Issue は所有者・リポジトリ・番号で加え、項目は DELETE で外す", async () => {
+    const { http, calls } = testHttp((c) =>
+      c.method === "POST"
+        ? json({ id: 321, content_type: "Issue", archived_at: null, updated_at: "2026-11-09T00:00:00Z", content: null }, { status: 201 })
+        : new Response(null, { status: 204 }),
+    );
+    const project = { owner: { login: "acme", type: "Organization" }, number: 5 };
+    const added = await addProjectItem(http, project, { type: "Issue", owner: "acme", repo: "web", number: 7 });
+    await deleteProjectItem(http, project, 9);
+    expect(added.id).toBe(321);
+    expect(calls.map((c) => [c.method, c.url.pathname, c.body])).toEqual([
+      ["POST", "/orgs/acme/projectsV2/5/items", JSON.stringify({ type: "Issue", owner: "acme", repo: "web", number: 7 })],
+      ["DELETE", "/orgs/acme/projectsV2/5/items/9", null],
+    ]);
   });
 
   it("項目のフィールドは PATCH で選択肢の ID を送って変える", async () => {

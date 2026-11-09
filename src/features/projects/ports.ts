@@ -30,6 +30,11 @@ export interface ProjectOperations {
   loadBoard(project: Project, signal?: AbortSignal): Promise<Board>;
   /** 項目を別の列へ動かす。statusId が null なら未設定にする */
   moveItem(board: Board, itemId: number, statusId: string | null): Promise<void>;
+  /**
+   * Issue か PR を別のプロジェクトへ移す。移す先に加えて statusId の列にしてから、元のプロジェクトから外す。
+   * 移す先での項目を返す。途中で失敗したら元のプロジェクトには残す
+   */
+  moveToProject(from: Board, itemId: number, to: Board, statusId: string | null): Promise<ProjectItem>;
   loadPreferences(): Promise<BoardPreferences>;
   savePreferences(preferences: BoardPreferences): Promise<void>;
 }
@@ -41,6 +46,9 @@ export interface ProjectSource {
   /** fieldId のフィールドの値も一緒に取得する */
   listItems(project: Project, fieldId: number | null, signal?: AbortSignal): Promise<ProjectItem[]>;
   setItemField(project: Project, itemId: number, fieldId: number, optionId: string | null): Promise<void>;
+  /** Issue か PR を加え、加えた項目の ID を返す */
+  addItem(project: Project, item: Pick<ProjectItem, "kind" | "repo" | "number">): Promise<number>;
+  removeItem(project: Project, itemId: number): Promise<void>;
 }
 
 export interface BoardPreferencesRepository {
