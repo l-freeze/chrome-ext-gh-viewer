@@ -215,6 +215,39 @@ const step = async (name, fn) => {
     await page.getByText("Projects of 1 owner could not be loaded").waitFor();
   });
 
+  await step("カンバン: 別のプロジェクトへドラッグすると、確認のあとで移す（ドラフトは移せない）", async () => {
+    const card = () => page.locator(".board", { hasText: "Mobile releases" }).locator(".card", { hasText: "Upgrade to the new push notification SDK" });
+    const target = kanbanColumn("Platform roadmap", "Todo");
+    const dialog = page.locator("dialog.transfer-dialog");
+    // 取り消せば何も送らない
+    await card().dragTo(target, { targetPosition: { x: 100, y: 12 } });
+    await dialog.getByText("Move to another project?").waitFor();
+    await dialog.getByText("Move “Upgrade to the new push notification SDK” from “acme-labs / Mobile releases” to “Todo” in “acme-labs / Platform roadmap”.").waitFor();
+    await page.screenshot({ path: path.join(OUT, "06h-kanban-transfer-confirm.png") });
+    await dialog.getByRole("button", { name: "Cancel" }).click();
+    assert.deepEqual(control.projectChanges, []);
+    await card().waitFor();
+
+    await card().dragTo(target, { targetPosition: { x: 100, y: 12 } });
+    await dialog.getByRole("button", { name: "Move", exact: true }).click();
+    await target.locator(".card", { hasText: "Upgrade to the new push notification SDK" }).waitFor();
+    assert.equal(await card().count(), 0);
+    const movedId = control.projectItems["acme-labs/1"].at(-1).id;
+    assert.deepEqual(control.projectChanges, [
+      { project: "acme-labs/1", method: "POST", body: { type: "Issue", owner: "acme-labs", repo: "mobile-app", number: 1203 } },
+      { project: "acme-labs/3", method: "DELETE", item: fx.projectItems["acme-labs/3"][0].id },
+    ]);
+    assert.deepEqual(control.patches.at(-1), { project: "acme-labs/1", item: movedId, body: { fields: [{ id: 301, value: "todo" }] } });
+
+    // ドラフトは別のプロジェクトへ落とせない（確認も出さず、何も送らない）
+    const before = control.projectChanges.length;
+    await page.locator(".board", { hasText: "Platform roadmap" }).locator(".card", { hasText: "Plan the Q1 load test" })
+      .dragTo(kanbanColumn("Mobile releases", "Ready"), { targetPosition: { x: 100, y: 12 } });
+    await page.waitForTimeout(300);
+    assert.equal(await dialog.isVisible(), false);
+    assert.equal(control.projectChanges.length, before);
+  });
+
   await step("カンバン: 折りたたんだプロジェクトは覚えておき、開くまで項目を取得しない", async () => {
     await page.getByRole("button", { name: /Mobile releases/ }).click();
     assert.equal(await page.getByRole("button", { name: /Mobile releases/ }).getAttribute("aria-expanded"), "false");
@@ -226,7 +259,8 @@ const step = async (name, fn) => {
     await page.waitForTimeout(300);
     assert.equal(mobile(), before);
     await page.getByRole("button", { name: /Mobile releases/ }).click();
-    await page.getByRole("link", { name: "Upgrade to the new push notification SDK" }).waitFor();
+    // 項目は前のステップで別のプロジェクトへ移したので、列が出るのを待つ
+    await kanbanColumn("Mobile releases", "Backlog").waitFor();
     assert.equal(mobile(), before + 1);
   });
 

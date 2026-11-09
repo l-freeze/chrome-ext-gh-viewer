@@ -4,7 +4,7 @@
 // - 取得し直すのは、再読み込み・自動更新・作業範囲が変わったとき。自動更新では表示を消さずに、変わったところだけ差し替える
 
 import { batch, createEffect, createMemo, createSignal, on, type Accessor } from "solid-js";
-import { withItemStatus, type Board } from "../../../features/projects/board";
+import { withItem, withItemStatus, withoutItem, type Board } from "../../../features/projects/board";
 import { projectKey, type ItemKind, type Project } from "../../../features/projects/project";
 import { DEFAULT_BOARD_PREFERENCES, type BoardPreferences, type OwnerProjects } from "../../../features/projects/ports";
 import { settleEach } from "../../../lib/concurrency";
@@ -23,6 +23,17 @@ export interface MoveFailure {
 }
 
 const BOARD_CONCURRENCY = 4;
+
+/** 別のプロジェクトへ移す前の確認に出す内容 */
+export interface PendingTransfer {
+  from: Project;
+  to: Project;
+  itemId: number;
+  title: string;
+  statusId: string | null;
+  /** 落とした列の名前 */
+  column: string;
+}
 
 /** 取り直した盤面のうち、変わっていない部分は前のオブジェクトを使う（カードを作り直さないため） */
 function refreshed(old: Board, fresh: Board): Board {
@@ -43,6 +54,7 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
   const [prefs, setPrefs] = createSignal<BoardPreferences | null>(null);
   const [moving, setMoving] = createSignal<ReadonlySet<string>>(new Set());
   const [moveFailure, setMoveFailure] = createSignal<MoveFailure | null>(null);
+  const [pendingTransfer, setPendingTransfer] = createSignal<PendingTransfer | null>(null);
   const [tasks, setTasks] = createSignal({ done: 0, total: 0 });
 
   void ops.loadPreferences().then(setPrefs, () => setPrefs(DEFAULT_BOARD_PREFERENCES));
@@ -188,6 +200,42 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
     }
   }
 
+  /** 確認のあとで、別のプロジェクトへ移す。成功したら両方の盤面を書き換える（取り直さない） */
+  async function confirmTransfer() {
+    const p = pendingTransfer();
+    setPendingTransfer(null);
+    if (!p) return;
+    const fromKey = projectKey(p.from);
+    const toKey = projectKey(p.to);
+    const from = boards().get(fromKey);
+    const to = boards().get(toKey);
+    const movingKey = `${fromKey}:${p.itemId}`;
+    if (from?.status !== "ready" || to?.status !== "ready" || moving().has(movingKey)) return;
+    lastMove.set(fromKey, ++moveCount);
+    lastMove.set(toKey, moveCount);
+    batch(() => {
+      setMoving((prev) => new Set(prev).add(movingKey));
+      setMoveFailure(null);
+    });
+    try {
+      const moved = await ops.moveToProject(from.board, p.itemId, to.board, p.statusId);
+      batch(() => {
+        const currentFrom = boards().get(fromKey);
+        const currentTo = boards().get(toKey);
+        if (currentFrom?.status === "ready") setBoard(fromKey, { status: "ready", board: withoutItem(currentFrom.board, p.itemId) });
+        if (currentTo?.status === "ready") setBoard(toKey, { status: "ready", board: withItem(currentTo.board, moved) });
+      });
+    } catch (error) {
+      setMoveFailure({ title: p.title, error, owner: p.to.owner });
+    } finally {
+      setMoving((prev) => {
+        const next = new Set(prev);
+        next.delete(movingKey);
+        return next;
+      });
+    }
+  }
+
   /** 自動更新: 取得済みの所有者のプロジェクトと、表示しているプロジェクトの項目を取り直す。読み込み中や移動中は何もしない */
   async function poll() {
     if (tasks().total > 0 || moving().size > 0) return;
@@ -249,6 +297,11 @@ export function createKanbanState(deps: UiDeps, ws: WorkspaceState, active: Acce
     isMoving: (project: Project, itemId: number) => moving().has(`${projectKey(project)}:${itemId}`),
     move,
     moveFailure,
+    pendingTransfer,
+    /** 別のプロジェクトへ落としたとき。すぐには移さず、確認を出す */
+    requestTransfer: (transfer: PendingTransfer) => setPendingTransfer(transfer),
+    cancelTransfer: () => setPendingTransfer(null),
+    confirmTransfer,
     dismissMoveFailure: () => setMoveFailure(null),
     failures: createMemo(() => ownerResults().filter((r) => r.error !== null)),
     /** 選んだ所有者のプロジェクトの一覧を、すべて取得し終えたか */

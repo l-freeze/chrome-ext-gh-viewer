@@ -57,3 +57,15 @@ export function adjacentStatus(board: Board, item: ProjectItem, direction: -1 | 
 export function withItemStatus(board: Board, itemId: number, statusId: string | null): Board {
   return { ...board, items: board.items.map((i) => (i.id === itemId ? { ...i, statusId } : i)) };
 }
+
+/** 項目を外した盤面を返す（元の盤面は変えない） */
+export function withoutItem(board: Board, itemId: number): Board {
+  return { ...board, items: board.items.filter((i) => i.id !== itemId) };
+}
+
+/** 項目を加えた盤面を返す。同じ ID があれば置き換える（元の盤面は変えない） */
+export function withItem(board: Board, item: ProjectItem): Board {
+  return board.items.some((i) => i.id === item.id)
+    ? { ...board, items: board.items.map((i) => (i.id === item.id ? item : i)) }
+    : { ...board, items: [...board.items, item] };
+}

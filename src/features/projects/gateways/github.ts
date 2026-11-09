@@ -1,5 +1,8 @@
+import { isGitHubApiError } from "../../../integrations/github/errors";
 import type { GitHubHttp } from "../../../integrations/github/http";
 import {
+  addProjectItem,
+  deleteProjectItem,
   listOwnerProjects,
   listProjectFields,
   listProjectItems,
@@ -89,6 +92,24 @@ export function createGitHubProjectSource(httpFor: (ownerLogin: string) => GitHu
         fieldIds: fieldId === null ? [] : [fieldId],
       });
       return items.filter((i) => i.archived_at === null).map((i) => toProjectItem(i, fieldId));
+    },
+    async addItem(project, item) {
+      if (item.kind === "draft" || !item.repo || item.number === null) throw new Error("Only issues and pull requests can be added");
+      const added = await addProjectItem(httpFor(project.owner.login), pathOf(project), {
+        type: item.kind === "issue" ? "Issue" : "PullRequest",
+        owner: item.repo.owner,
+        repo: item.repo.name,
+        number: item.number,
+      });
+      return added.id;
+    },
+    async removeItem(project, itemId) {
+      try {
+        await deleteProjectItem(httpFor(project.owner.login), pathOf(project), itemId);
+      } catch (e) {
+        // すでに外れていれば成功とみなす
+        if (!isGitHubApiError(e, "not_found")) throw e;
+      }
     },
     async setItemField(project, itemId, fieldId, optionId) {
       await updateProjectItemField(httpFor(project.owner.login), pathOf(project), itemId, { id: fieldId, value: optionId });

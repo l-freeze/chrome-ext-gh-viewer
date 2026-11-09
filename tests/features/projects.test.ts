@@ -75,6 +75,8 @@ describe("プロジェクトの操作", () => {
     listSelectFields: async () => [status],
     listItems: async () => [],
     setItemField: async () => undefined,
+    addItem: async () => 500,
+    removeItem: async () => undefined,
     ...o,
   });
   const feature = (source: ProjectSource) => createProjectsFeature({ source, preferences: createBoardPreferencesStorage(memoryDriver()) });
@@ -105,6 +107,58 @@ describe("プロジェクトの操作", () => {
     await f.moveItem(b, 1, "done");
     await f.moveItem(b, 1, null);
     expect(sent).toEqual([[1, 30, "done"], [1, 30, null]]);
+  });
+
+  describe("別のプロジェクトへ移す", () => {
+    const target: Board = {
+      project: project(2, { title: "Other" }),
+      field: { id: 40, name: "Status", options: [{ id: "new", name: "New", color: null, description: null }] },
+      items: [],
+    };
+    const recorder = () => {
+      const calls: string[] = [];
+      const source = fake({
+        addItem: async (p, i) => (calls.push(`add P${p.number} ${i.repo?.name}#${i.number}`), 500),
+        setItemField: async (p, id, field, option) => void calls.push(`set P${p.number} ${id} ${field}=${option}`),
+        removeItem: async (p, id) => void calls.push(`remove P${p.number} ${id}`),
+      });
+      return { calls, source };
+    };
+
+    it("移す先に加えて列を付けてから、元のプロジェクトから外す", async () => {
+      const { calls, source } = recorder();
+      const moved = await feature(source).moveToProject(board([item(1, "todo")]), 1, target, "new");
+      expect(calls).toEqual(["add P2 web#1", "set P2 500 40=new", "remove P1 1"]);
+      expect([moved.id, moved.statusId, moved.title]).toEqual([500, "new", "Item 1"]);
+    });
+
+    it("移す先ですでに同じ Issue があれば加えずに使い、元からだけ外す", async () => {
+      const { calls, source } = recorder();
+      const withSame = { ...target, items: [{ ...item(1, "new"), id: 77 }] };
+      const moved = await feature(source).moveToProject(board([item(1, "todo")]), 1, withSame, "new");
+      expect(calls).toEqual(["remove P1 1"]);
+      expect(moved.id).toBe(77);
+    });
+
+    it("列を付けられなければ、加えた分を外して元のプロジェクトに残す", async () => {
+      const calls: string[] = [];
+      const source = fake({
+        addItem: async () => (calls.push("add"), 500),
+        setItemField: async () => Promise.reject(new Error("forbidden")),
+        removeItem: async (p, id) => void calls.push(`remove P${p.number} ${id}`),
+      });
+      await expect(feature(source).moveToProject(board([item(1, "todo")]), 1, target, "new")).rejects.toThrow("forbidden");
+      expect(calls).toEqual(["add", "remove P2 500"]);
+    });
+
+    it("ドラフト・同じプロジェクト・移す先にない列へは移さない", async () => {
+      const { calls, source } = recorder();
+      const f = feature(source);
+      await expect(f.moveToProject(board([item(1, "todo", "draft")]), 1, target, "new")).rejects.toBeInstanceOf(InvalidMoveError);
+      await expect(f.moveToProject(board([item(1, "todo")]), 1, board([]), "todo")).rejects.toBeInstanceOf(InvalidMoveError);
+      await expect(f.moveToProject(board([item(1, "todo")]), 1, target, "todo")).rejects.toBeInstanceOf(InvalidMoveError);
+      expect(calls).toEqual([]);
+    });
   });
 
   it("表示の好みは、保存がなければ Issue とドラフトを表示し、知らない種類は読み捨てる", async () => {

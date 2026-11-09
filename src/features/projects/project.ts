@@ -56,6 +56,11 @@ export interface ProjectItem {
   updatedAt: string;
 }
 
+/** 別のプロジェクトへ移せる項目か。ドラフトはプロジェクトの中にしかないので移せない */
+export function canMoveToAnotherProject(item: Pick<ProjectItem, "kind" | "repo" | "number">): boolean {
+  return item.kind !== "draft" && item.repo !== null && item.number !== null;
+}
+
 /** 画面での区別や保存に使うキー。所有者（小文字）とプロジェクト番号 */
 export function projectKey(project: Pick<Project, "owner" | "number">): string {
   return `${project.owner.login.toLowerCase()}/${project.number}`;

@@ -199,7 +199,24 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       const key = `${owner}/${number}`;
       const field = fx.statusFieldByProject[key];
       if (part === "fields") return json(route, [{ id: 300, name: "Title", data_type: "title" }, ...(field ? [field] : [])]);
-      const items = control.projectItems[key] ?? [];
+      const items = (control.projectItems[key] ??= []);
+      if (part === "items" && !itemIdText && req.method() === "POST") {
+        // 所有者・リポジトリ・番号で Issue を加える（すでにあればその項目を返す）
+        const body = JSON.parse(req.postData() ?? "{}");
+        control.projectChanges.push({ project: key, method: "POST", body });
+        const url = `https://github.com/${body.owner}/${body.repo}/${body.type === "Issue" ? "issues" : "pull"}/${body.number}`;
+        const existing = items.find((i) => i.content?.html_url === url);
+        if (existing) return json(route, existing, 201);
+        const content = Object.values(control.projectItems).flat().find((i) => i.content?.html_url === url)?.content;
+        const added = { id: control.nextItemId++, content_type: body.type, content: content ?? null, status: null, created_at: new Date().toISOString(), updated_at: new Date().toISOString(), archived_at: null };
+        items.push(added);
+        return json(route, added, 201);
+      }
+      if (part === "items" && itemIdText && req.method() === "DELETE") {
+        control.projectChanges.push({ project: key, method: "DELETE", item: Number(itemIdText) });
+        control.projectItems[key] = items.filter((i) => i.id !== Number(itemIdText));
+        return route.fulfill({ status: 204 });
+      }
       if (part === "items" && !itemIdText) {
         const fields = (url.searchParams.get("fields") ?? "").split(",").filter(Boolean).map(Number);
         return json(route, items.map(({ status, ...i }) => ({
@@ -283,6 +300,8 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     issues: structuredClone(fx.issuesByOwner),
     projectItems: structuredClone(fx.projectItems),
     patches: [],
+    projectChanges: [],
+    nextItemId: 9500,
     nextRunId: 90001,
     dispatchedRuns: [],
     hideRunGets: 0,
