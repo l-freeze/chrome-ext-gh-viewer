@@ -14,7 +14,7 @@ src/
 │   ├── caches/               Actions のキャッシュ
 │   ├── actions/              ワークフロー一覧・手動実行・実行履歴の整理
 │   ├── releases/             Release の一覧と添付ファイルのダウンロード（閲覧のみ）
-│   ├── secrets/              Actions のシークレットと変数の一覧（閲覧のみ）
+│   ├── secrets/              Actions のシークレットと変数の一覧と比較表（閲覧のみ。Secrets & Variables タブの List と Matrix）
 │   ├── issues/               Issue の横断検索（Issue タブの List）
 │   ├── preferences/          画面をまたぐ表示の好み（自動更新のオン・オフ）
 │   └── projects/             Projects のカンバンと、項目の Status の変更（Issue タブの Kanban）
@@ -100,6 +100,9 @@ ui/
 - 既存の機能を組み合わせて見せるだけ → `screens/` に画面だけを足す
 
 例: Issue タブの Kanban は、Projects という新しい API の分野とモデル（プロジェクト・列・項目）を扱うため、`features/projects` と `screens/kanban` を足しています。List（`features/issues` と `screens/issues`）とは独立しています。
+
+例: Secrets & Variables タブの Matrix（比較表）は、一覧と同じ取得結果を並べ直すだけなので、新しい機能は足していません。
+行列を組み立てる規則を `features/secrets/matrix.ts` に、画面を `screens/secrets/MatrixScreen.tsx` と `matrix-state.ts` に置き、一覧の `item.ts`・`state.ts`・`SecretsScreen.tsx` には依存させていません（取得結果だけを一覧の状態から受け取る）。
 
 ### 自動更新
 
