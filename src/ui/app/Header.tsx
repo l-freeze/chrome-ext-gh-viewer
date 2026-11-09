@@ -6,9 +6,12 @@ import { useUi } from "./context";
 import type { WorkspaceState } from "./workspace";
 import "./header.css";
 
-export type Route = "artifacts" | "caches" | "actions" | "releases" | "issues" | "kanban" | "secrets" | "settings";
+export type Route = "artifacts" | "caches" | "actions" | "releases" | "issues" | "kanban" | "secrets" | "secretsMatrix" | "settings";
 
-/** URL の # 以降と画面の対応。Issue タブは一覧（#issues・#issues/list）とカンバン（#issues/kanban）に分かれる */
+/**
+ * URL の # 以降と画面の対応。Issue タブは一覧（#issues・#issues/list）とカンバン（#issues/kanban）に、
+ * Secrets & Variables タブは一覧（#secrets・#secrets/list）と比較表（#secrets/matrix）に分かれる
+ */
 export const ROUTE_HASH: Record<Route, string> = {
   artifacts: "artifacts",
   caches: "caches",
@@ -17,12 +20,14 @@ export const ROUTE_HASH: Record<Route, string> = {
   issues: "issues",
   kanban: "issues/kanban",
   secrets: "secrets",
+  secretsMatrix: "secrets/matrix",
   settings: "settings",
 };
 
 export function routeOf(hash: string): Route {
   const h = hash.replace(/^#/, "");
   if (h === "issues/list") return "issues";
+  if (h === "secrets/list") return "secrets";
   const found = (Object.keys(ROUTE_HASH) as Route[]).find((r) => ROUTE_HASH[r] === h);
   return found ?? "artifacts";
 }
@@ -67,7 +72,7 @@ export function Header(props: {
     };
   };
 
-  const tab = (route: Exclude<Route, "settings" | "kanban">, label: string, count: Accessor<number>, showZero = false, current = props.route === route) => (
+  const tab = (route: Exclude<Route, "settings" | "kanban" | "secretsMatrix">, label: string, count: Accessor<number>, showZero = false, current = props.route === route) => (
     <a class="tab" href={`#${ROUTE_HASH[route]}`} aria-current={current ? "page" : undefined}>
       {label}
       <Show when={props.connected && (showZero || count() > 0)}>
@@ -76,30 +81,42 @@ export function Header(props: {
     </a>
   );
 
-  // Issue タブ: マウスを合わせるかフォーカスすると、文字の下に「一覧」と「カンバン」を出す。
+  // Issue タブと Secrets & Variables タブ: マウスを合わせるかフォーカスすると、文字の下に切り替え先を出す。
   // タブの並びは狭い幅で横にスクロールするため、メニューは position: fixed でタブの真下に置く
   const [menuAt, setMenuAt] = createSignal<{ left: number; top: number }>({ left: 0, top: 0 });
   const placeMenu = (e: { currentTarget: HTMLElement }) => {
     const r = e.currentTarget.getBoundingClientRect();
     setMenuAt({ left: r.left, top: r.bottom });
   };
-  const issuesTab = () => (
+  const menuTab = (
+    main: { route: "issues" | "secrets"; label: string; count: Accessor<number> },
+    items: Array<{ route: Route; href: string; label: string }>,
+  ) => (
     <div class="tab-menu" onPointerEnter={placeMenu} onFocusIn={placeMenu}>
-      {tab("issues", t("tab.issues"), props.counts.issues, false, props.route === "issues" || props.route === "kanban")}
-      <ul class="tab-menu__list" style={{ left: `${menuAt().left}px`, top: `${menuAt().top}px` }} aria-label={t("tab.issues")}>
-        <li>
-          <a href="#issues/list" aria-current={props.route === "issues" ? "page" : undefined}>
-            {t("tab.issues.list")}
-          </a>
-        </li>
-        <li>
-          <a href={`#${ROUTE_HASH.kanban}`} aria-current={props.route === "kanban" ? "page" : undefined}>
-            {t("tab.issues.kanban")}
-          </a>
-        </li>
+      {tab(main.route, main.label, main.count, false, items.some((i) => i.route === props.route))}
+      <ul class="tab-menu__list" style={{ left: `${menuAt().left}px`, top: `${menuAt().top}px` }} aria-label={main.label}>
+        <For each={items}>
+          {(item) => (
+            <li>
+              <a href={item.href} aria-current={props.route === item.route ? "page" : undefined}>
+                {item.label}
+              </a>
+            </li>
+          )}
+        </For>
       </ul>
     </div>
   );
+  const issuesTab = () =>
+    menuTab({ route: "issues", label: t("tab.issues"), count: props.counts.issues }, [
+      { route: "issues", href: "#issues/list", label: t("tab.issues.list") },
+      { route: "kanban", href: `#${ROUTE_HASH.kanban}`, label: t("tab.issues.kanban") },
+    ]);
+  const secretsTab = () =>
+    menuTab({ route: "secrets", label: t("tab.secrets"), count: props.counts.secrets }, [
+      { route: "secrets", href: "#secrets/list", label: t("tab.secrets.list") },
+      { route: "secretsMatrix", href: `#${ROUTE_HASH.secretsMatrix}`, label: t("tab.secrets.matrix") },
+    ]);
 
   return (
     <header class="band">
@@ -114,7 +131,7 @@ export function Header(props: {
           {tab("actions", t("tab.actions"), props.counts.actions)}
           {tab("releases", t("tab.releases"), props.counts.releases)}
           {issuesTab()}
-          {tab("secrets", t("tab.secrets"), props.counts.secrets)}
+          {secretsTab()}
         </nav>
         <div class="band__spacer" />
         <Show when={props.meter}>
