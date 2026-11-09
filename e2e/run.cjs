@@ -301,9 +301,10 @@ const step = async (name, fn) => {
     await page.getByRole("link", { name: /^Secrets & Variables/ }).click();
     const table = page.locator("table.table--secrets");
     await table.getByText("DEPLOY_KEY").waitFor();
+    // 全リポジトリを読み終えてから数える（DEPLOY_KEY の web-console が先に読み終わることがある）
+    await page.getByText("7 items").waitFor();
     assert.equal(await table.locator(".group-row").count(), 2);
     assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 7);
-    await page.getByText("7 items").waitFor();
     // Secrets の値は出さない（GitHub も返さない）。Variables は値を出す。Environment の名前を範囲に出す
     const deployKey = table.locator("tr", { hasText: "DEPLOY_KEY" });
     await deployKey.getByText(/^Hidden/).waitFor();
