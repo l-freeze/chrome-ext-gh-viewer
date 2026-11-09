@@ -301,9 +301,10 @@ const step = async (name, fn) => {
     await page.getByRole("link", { name: /^Secrets & Variables/ }).click();
     const table = page.locator("table.table--secrets");
     await table.getByText("DEPLOY_KEY").waitFor();
+    // 全リポジトリを読み終えてから数える（DEPLOY_KEY の web-console が先に読み終わることがある）
+    await page.getByText("7 items").waitFor();
     assert.equal(await table.locator(".group-row").count(), 2);
     assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 7);
-    await page.getByText("7 items").waitFor();
     // Secrets の値は出さない（GitHub も返さない）。Variables は値を出す。Environment の名前を範囲に出す
     const deployKey = table.locator("tr", { hasText: "DEPLOY_KEY" });
     await deployKey.getByText(/^Hidden/).waitFor();
@@ -326,6 +327,53 @@ const step = async (name, fn) => {
     assert.ok(requests.every((l) => l.startsWith("GET ")), requests.join("\n"));
     const forRepo = (r) => requests.filter((l) => l.includes(`/repos/${r}/`)).length;
     assert.equal(forRepo("acme-labs/web-console"), 3 + 2 * 2);
+  });
+
+  await step("シークレットと変数の比較表: 名前ごとに、どのリポジトリ・Environment にあるかを並べる（呼び出しは増えない）", async () => {
+    const before = log.length;
+    await page.getByRole("link", { name: /^Secrets & Variables/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Matrix" }).click();
+    await page.mouse.move(200, 800);
+    const table = page.locator("table.table--matrix");
+    await table.getByText("ITCH_API_KEY").waitFor();
+    // 列: web-console のリポジトリ単位・production・staging と、tile-game のリポジトリ単位
+    assert.deepEqual(await table.locator("thead .matrix__repo").allInnerTexts(), ["acme-labs/web-console", "octo-dev/tile-game"]);
+    assert.equal(await table.locator("thead .matrix__scope").count(), 4);
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 6);
+    await page.getByText("6 names").waitFor();
+    // リポジトリ単位の NPM_TOKEN は Environment でも使える。tile-game には無い
+    const npm = table.locator("tr", { hasText: "NPM_TOKEN" });
+    assert.deepEqual(
+      await npm.locator(".matrix__cell").evaluateAll((cells) => cells.map((c) => c.className.replace("matrix__cell matrix__cell--", ""))),
+      ["set", "inherited", "inherited", "missing"],
+    );
+    await npm.getByText("3 / 4").waitFor();
+    // API_URL は Environment にだけあり、リポジトリ単位には無い
+    const api = table.locator("tr", { hasText: "API_URL" });
+    assert.deepEqual(
+      await api.locator(".matrix__cell").evaluateAll((cells) => cells.map((c) => c.className.replace("matrix__cell matrix__cell--", ""))),
+      ["missing", "set", "set", "missing"],
+    );
+    assert.match((await api.locator(".matrix__cell").nth(2).getAttribute("title")) ?? "", /staging\.acme-labs\.example/);
+    await page.screenshot({ path: path.join(OUT, "06g-secrets-matrix.png") });
+
+    await page.getByRole("radio", { name: "Variables" }).click();
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 2);
+    await page.getByPlaceholder("Secret or variable name").fill("node");
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 1);
+    await page.getByPlaceholder("Secret or variable name").fill("");
+    await page.getByRole("radio", { name: "All" }).click();
+    await page.getByLabel("Only names with gaps").check();
+    assert.equal(await table.locator("tbody tr:not(.group-row)").count(), 6);
+    await page.getByLabel("Only names with gaps").uncheck();
+
+    // 一覧と同じ取得結果を使うので、比較表に切り替えても呼び出さない。一覧に戻しても表示はそのまま
+    const requests = log.slice(before).filter((l) => /\/(actions\/(secrets|variables)|environments)/.test(l));
+    assert.deepEqual(requests, []);
+    await page.getByRole("link", { name: /^Secrets & Variables/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "List" }).click();
+    await page.mouse.move(200, 800);
+    await page.locator("table.table--secrets").getByText("DEPLOY_KEY").waitFor();
   });
 
   await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {

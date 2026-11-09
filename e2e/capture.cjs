@@ -18,6 +18,11 @@ async function shot(page, section, file, caption, { fullPage = false } = {}) {
 
 const url = (id, hash = "") => `chrome-extension://${id}/manager.html${hash}`;
 const rows = (page) => page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+// 前の操作でタブの上に残ったマウスがメニューを開かないよう、外へ動かしてから待つ
+const matrix = async (page) => {
+  await page.mouse.move(200, 800);
+  await page.locator("table.table--matrix").getByText("ITCH_API_KEY").waitFor();
+};
 const loaded = (page) => page.waitForFunction(() => !document.querySelector(".row--skeleton"));
 
 async function addPat(page, id, token, { ja = false } = {}) {
@@ -183,6 +188,25 @@ async function connected(page, id, opts) {
     await context.close();
   }
 
+  // ---- Secrets と Variables ----------------------------------------------------------
+  {
+    const { context, page, id } = await launch({ ext: extOAuth });
+    await connected(page, id);
+    await page.goto(url(id, "#secrets"));
+    await page.getByText("7 items").waitFor();
+    await shot(page, "Secrets", "35-secrets.png", "Secrets & Variables: 一覧");
+    await page.getByRole("link", { name: /^Secrets & Variables/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Matrix" }).waitFor();
+    await shot(page, "Secrets", "36-secrets-menu.png", "Secrets & Variables タブにマウスを合わせたときのメニュー");
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Matrix" }).click();
+    await page.mouse.move(200, 800);
+    await matrix(page);
+    await shot(page, "Secrets", "37-secrets-matrix.png", "比較表（行は名前、列はリポジトリと Environment）");
+    await page.getByRole("radio", { name: "Variables" }).click();
+    await shot(page, "Secrets", "38-secrets-matrix-variables.png", "比較表: Variables だけ");
+    await context.close();
+  }
+
   // ---- ダーク ---------------------------------------------------------------------
   {
     const { context, page, id } = await launch({ ext: extOAuth, colorScheme: "dark" });
@@ -199,6 +223,9 @@ async function connected(page, id, opts) {
     await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
     await page.waitForFunction(() => !document.querySelector(".board__message"));
     await shot(page, "Dark", "34-dark-kanban.png", "ダーク: カンバン");
+    await page.goto(url(id, "#secrets/matrix"));
+    await matrix(page);
+    await shot(page, "Dark", "39-dark-secrets-matrix.png", "ダーク: Secrets と Variables の比較表");
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "Dark", "33-dark-settings.png", "ダーク: 設定");
@@ -224,6 +251,13 @@ async function connected(page, id, opts) {
     await page.getByRole("link", { name: /Billing page crashes/ }).waitFor();
     await page.waitForFunction(() => !document.querySelector(".board__message"));
     await shot(page, "日本語", "45-ja-kanban.png", "日本語: カンバン");
+    await page.goto(url(id, "#secrets/matrix"));
+    await matrix(page);
+    await shot(page, "日本語", "46-ja-secrets-matrix.png", "日本語: Secrets と Variables の比較表");
+    await page.getByRole("link", { name: /^Secrets & Variables/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "比較表" }).waitFor();
+    await shot(page, "日本語", "47-ja-secrets-menu.png", "日本語: Secrets & Variables のメニュー");
+    await page.mouse.move(200, 800);
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "日本語", "44-ja-settings.png", "日本語: 設定");
@@ -247,6 +281,16 @@ async function connected(page, id, opts) {
     await page.waitForFunction(() => !document.querySelector(".board__message"));
     await shot(page, "狭い画面（幅 420px）", "54-narrow-kanban.png", "幅 420px: カンバン（列は枠の中で横にスクロール）");
     console.log("narrow kanban horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.goto(url(id, "#secrets/matrix"));
+    await matrix(page);
+    await shot(page, "狭い画面（幅 420px）", "55-narrow-secrets-matrix.png", "幅 420px: 比較表（表は枠の中で横にスクロールし、名前の列は左に固定）");
+    console.log("narrow matrix horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.locator(".matrix__wrap").evaluate((el) => (el.scrollLeft = el.scrollWidth));
+    await shot(page, "狭い画面（幅 420px）", "56-narrow-secrets-matrix-scrolled.png", "幅 420px: 比較表を右端までスクロールしたところ");
+    await page.getByRole("link", { name: /^Secrets & Variables/ }).hover();
+    await page.locator(".tab-menu__list").getByRole("link", { name: "Matrix" }).waitFor();
+    await shot(page, "狭い画面（幅 420px）", "57-narrow-secrets-menu.png", "幅 420px: Secrets & Variables のメニュー");
+    await page.mouse.move(200, 800);
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "狭い画面（幅 420px）", "52-narrow-settings.png", "幅 420px: 設定");

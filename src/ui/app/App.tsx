@@ -17,6 +17,8 @@ import { createKanbanState } from "../screens/kanban/state";
 import { createIssuesState } from "../screens/issues/state";
 import { ReleasesScreen } from "../screens/releases/ReleasesScreen";
 import { createReleasesState } from "../screens/releases/state";
+import { createSecretsMatrixState } from "../screens/secrets/matrix-state";
+import { MatrixScreen } from "../screens/secrets/MatrixScreen";
 import { SecretsScreen } from "../screens/secrets/SecretsScreen";
 import { createSecretsState } from "../screens/secrets/state";
 import { SettingsScreen } from "../screens/settings/SettingsScreen";
@@ -60,7 +62,9 @@ export function App(props: { deps: UiDeps }) {
   const cleanup = createRunCleanupState(deps, ws);
   const issues = createIssuesState(deps, ws, () => route() === "issues");
   const kanban = createKanbanState(deps, ws, () => route() === "kanban");
-  const secrets = createSecretsState(deps, ws, () => route() === "secrets");
+  // 一覧と比較表は同じ取得結果を使う（どちらを開いていても読み込み、切り替えても取り直さない）
+  const secrets = createSecretsState(deps, ws, () => route() === "secrets" || route() === "secretsMatrix");
+  const secretsMatrix = createSecretsMatrixState(secrets);
   const releases = createReleasesState(deps, ws, () => route() === "releases");
   const connected = () => settings.active().length > 0;
 
@@ -75,6 +79,7 @@ export function App(props: { deps: UiDeps }) {
     { route: "issues", intervalMs: () => ISSUES_REFRESH_MS, run: issues.poll },
     { route: "kanban", intervalMs: () => KANBAN_REFRESH_MS, run: kanban.poll },
     { route: "secrets", intervalMs: () => SECRETS_REFRESH_MS, run: secrets.results.poll },
+    { route: "secretsMatrix", intervalMs: () => SECRETS_REFRESH_MS, run: secrets.results.poll },
   ];
   for (const plan of refreshPlans) {
     createPolling({ when: () => autoRefresh.enabled() && connected() && route() === plan.route, intervalMs: plan.intervalMs, run: plan.run });
@@ -97,6 +102,7 @@ export function App(props: { deps: UiDeps }) {
       case "releases":
         return { progress: releases.results.progress(), refresh: releases.results.refresh };
       case "secrets":
+      case "secretsMatrix":
         return { progress: secrets.results.progress(), refresh: secrets.results.refresh };
       default:
         return { progress: artifacts.results.progress(), refresh: artifacts.results.refresh };
@@ -172,6 +178,9 @@ export function App(props: { deps: UiDeps }) {
                 </Match>
                 <Match when={route() === "secrets"}>
                   <SecretsScreen state={secrets} />
+                </Match>
+                <Match when={route() === "secretsMatrix"}>
+                  <MatrixScreen state={secretsMatrix} />
                 </Match>
                 <Match when={route() === "actions"}>
                   <ActionsScreen
