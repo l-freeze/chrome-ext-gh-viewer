@@ -1,5 +1,5 @@
 import { For, Show } from "solid-js";
-import type { SettingColumn } from "../../../features/repo-settings/comparison";
+import type { SettingColumn, SettingsSortKey } from "../../../features/repo-settings/comparison";
 import { differsFromMajority } from "../../../features/repo-settings/comparison";
 import { SETTINGS, type SettingGroup, type SettingKey, type SettingValue } from "../../../features/repo-settings/settings";
 import { repoKey } from "../../../features/workspace/repository";
@@ -57,6 +57,32 @@ export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
     return <span class="mono">{String(v.value)}</span>;
   }
 
+  /** 並べ替えの条件の中の位置（無ければ -1） */
+  const sortIndex = (column: SettingsSortKey) => s.sort().findIndex((x) => x.key === column);
+  /** 押すと並べ替える見出しの中身。条件が 2 つ以上なら、矢印に優先の順番を付ける */
+  const SortButton = (p: { column: SettingsSortKey; label: string }) => {
+    const entry = () => s.sort()[sortIndex(p.column)];
+    return (
+      <button type="button" class="sort repo-settings__sort" title={t("repoSettings.sortHint")} onClick={() => s.toggleSort(p.column)}>
+        {p.label}
+        <Show when={entry()}>
+          {(e) => (
+            <span class="repo-settings__sort-mark" aria-hidden="true">
+              {e().dir === "asc" ? "↑" : "↓"}
+              <Show when={s.sort().length > 1}>
+                <sup>{sortIndex(p.column) + 1}</sup>
+              </Show>
+            </span>
+          )}
+        </Show>
+      </button>
+    );
+  };
+  const ariaSort = (column: SettingsSortKey) => {
+    const e = s.sort()[sortIndex(column)];
+    return e ? (e.dir === "asc" ? "ascending" : "descending") : undefined;
+  };
+
   const Cell = (p: { value: SettingValue; column: SettingColumn }) => (
     <td class="repo-settings__cell" classList={{ "repo-settings__cell--differs": differsFromMajority(p.value, p.column) }}>
       <Value value={p.value} settingKey={p.column.key} />
@@ -80,6 +106,21 @@ export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
         </p>
       </div>
       <p class="muted small repo-settings__note">{t("repoSettings.note")}</p>
+      <div class="repo-settings__sortbar">
+        <span class="muted small" role="status">
+          {s.sort().length === 0
+            ? t("repoSettings.sortDefault")
+            : t("repoSettings.sortBy", {
+                keys: s
+                  .sort()
+                  .map((x) => `${x.key === "repo" ? t("repoSettings.col.repo") : t(`repoSettings.setting.${x.key}`)} ${x.dir === "asc" ? "↑" : "↓"}`)
+                  .join(t("repoSettings.sortSeparator")),
+              })}
+        </span>
+        <button type="button" class="button button--ghost repo-settings__reset" disabled={s.sort().length === 0} onClick={() => s.resetSort()}>
+          {t("repoSettings.resetSort")}
+        </button>
+      </div>
 
       <Failures
         title={t("failures.title", { count: s.results.failures().length })}
@@ -92,8 +133,8 @@ export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
           <table class="table table--repo-settings">
             <thead>
               <tr>
-                <th rowspan="2" scope="col" class="repo-settings__repo">
-                  {t("repoSettings.col.repo")}
+                <th rowspan="2" scope="col" class="repo-settings__repo" aria-sort={ariaSort("repo")}>
+                  <SortButton column="repo" label={t("repoSettings.col.repo")} />
                 </th>
                 <For each={groups()}>
                   {(g) => (
@@ -106,8 +147,8 @@ export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
               <tr>
                 <For each={s.columns()}>
                   {(c) => (
-                    <th scope="col" class="repo-settings__setting" title={t(`repoSettings.setting.${c.key}.full`)}>
-                      {t(`repoSettings.setting.${c.key}`)}
+                    <th scope="col" class="repo-settings__setting" title={t(`repoSettings.setting.${c.key}.full`)} aria-sort={ariaSort(c.key)}>
+                      <SortButton column={c.key} label={t(`repoSettings.setting.${c.key}`)} />
                     </th>
                   )}
                 </For>

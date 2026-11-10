@@ -87,3 +87,27 @@
 .repo-settings__on .icon {
   vertical-align: middle;
 }
+
+/* 並べ替え。設定の見出しは折り返すので、矢印は文字の後ろに続ける */
+.table--repo-settings .repo-settings__sort {
+  display: inline;
+  text-align: inherit;
+  font-weight: inherit;
+}
+.repo-settings__sort-mark {
+  margin-left: 2px;
+  color: var(--accent);
+  font-weight: 600;
+}
+.repo-settings__sortbar {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 4px 12px;
+  margin: 0 0 12px;
+}
+.repo-settings__reset {
+  height: 28px;
+  padding: 0 8px;
+  font-size: 13px;
+}
