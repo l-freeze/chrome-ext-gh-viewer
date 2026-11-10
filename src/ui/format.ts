@@ -1,4 +1,6 @@
-// 画面表示用の整形。言語に依存する部分は number（Intl.NumberFormat）を受け取る。
+// 画面表示用の整形。言語に依存する部分は number（Intl.NumberFormat）か t（文言）を受け取る。
+
+import type { Translate } from "./i18n";
 
 const UNITS = ["B", "KB", "MB", "GB", "TB"] as const;
 
@@ -35,4 +37,18 @@ export function labelTextColor(hex: string | null): "#000000" | "#ffffff" {
   const lin = (c: number) => (c <= 0.03928 ? c / 12.92 : ((c + 0.055) / 1.055) ** 2.4);
   const luminance = 0.2126 * lin(r!) + 0.7152 * lin(g!) + 0.0722 * lin(b!);
   return luminance > 0.4 ? "#000000" : "#ffffff";
+}
+
+/** 分の長さを、日・時間・分に分けて表す（例: 1440 → 1 日、160 → 2 時間 40 分）。0 の単位は出さない */
+export function formatDuration(totalMinutes: number, t: Translate): string {
+  const minutes = Math.max(0, Math.round(totalMinutes));
+  const days = Math.floor(minutes / 1440);
+  const hours = Math.floor((minutes % 1440) / 60);
+  const rest = minutes % 60;
+  const parts = [
+    days > 0 ? t("duration.days", { count: days }) : null,
+    hours > 0 ? t("duration.hours", { count: hours }) : null,
+    rest > 0 || minutes === 0 ? t("duration.minutes", { count: rest }) : null,
+  ].filter((p): p is string => p !== null);
+  return parts.join(t("duration.separator"));
 }

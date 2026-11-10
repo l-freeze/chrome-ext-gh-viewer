@@ -1,7 +1,7 @@
 import { createSignal, For, Show, type Accessor } from "solid-js";
 import { Avatar } from "../components/Avatar";
 import { Icon } from "../components/Icon";
-import { formatBytes } from "../format";
+import { formatBytes, formatDuration } from "../format";
 import { useUi } from "./context";
 import type { WorkspaceState } from "./workspace";
 import "./header.css";
@@ -163,7 +163,7 @@ export function Header(props: {
               aria-checked={a().enabled}
               aria-label={t("autoRefresh.label")}
               onClick={() => a().onToggle()}
-              title={t("autoRefresh.title", { count: a().minutes })}
+              title={t("autoRefresh.title", { count: a().minutes, interval: formatDuration(a().minutes, t) })}
             >
               <span class="switch__track" aria-hidden="true">
                 <span class="switch__thumb" />

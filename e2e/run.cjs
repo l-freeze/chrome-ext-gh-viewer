@@ -564,6 +564,8 @@ const step = async (name, fn) => {
     const table = page.locator("table.table--repo-settings");
     await table.getByRole("link", { name: "octo-dev/tile-game" }).waitFor();
     await page.getByText("9 settings differ in 3 repositories").waitFor();
+    // 取り直す間隔は、日・時間・分で示す（1440 分ではなく 1 日）
+    assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("title"), "Refresh every 1 day while this screen is open");
     await page.getByText("1 repository could not be read").waitFor();
     // 既定では違いのある設定だけ。行はいちばん多い値と、5 リポジトリ
     assert.deepEqual(await table.locator("thead .repo-settings__setting").allInnerTexts(), [
