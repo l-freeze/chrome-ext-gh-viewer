@@ -2,7 +2,7 @@ import { describe, expect, it } from "vitest";
 import { createLabelsFeature } from "../../src/features/labels/compose";
 import { createGitHubLabelSource } from "../../src/features/labels/gateways/github";
 import { changedFields, readLabelName, type Label } from "../../src/features/labels/label";
-import { buildPlan, buildTable, cellStatus, hasDifference, referenceOf, type LabelChange, type RowEdit } from "../../src/features/labels/sync";
+import { buildPlan, buildTable, cellStatus, deletionTargets, hasDifference, referenceOf, type LabelChange, type LabelTable, type RowEdit } from "../../src/features/labels/sync";
 import type { Repository } from "../../src/features/workspace/repository";
 import { json, testHttp } from "../helpers";
 
@@ -12,6 +12,7 @@ const repo = (name: string, archived = false): Repository => ({
   private: true, archived, htmlUrl: `https://github.com/acme/${name}`, pushedAt: null, defaultBranch: "master",
 });
 const source = (name: string, ...labels: Label[]) => ({ repo: { owner: "acme", name }, labels });
+const allRepos = (t: LabelTable) => new Set(t.columns.map((c) => c.key));
 const describeChange = (c: LabelChange) =>
   c.kind === "create" ? `create ${c.repo.name} ${c.next.name} #${c.next.color}` : `update ${c.repo.name} ${c.current.name}→${c.next.name} [${c.fields.join(",")}]`;
 
@@ -61,34 +62,47 @@ describe("ラベルの表", () => {
   });
 
   it("予定: 値が違うものを変え、足りないところに追加する。どちらかだけにもできる", () => {
-    const plan = buildPlan(table, { rows: ["bug"], edits: new Map(), add: true, update: true });
+    const plan = buildPlan(table, { repos: allRepos(table), rows: ["bug"], edits: new Map(), add: true, update: true });
     expect(plan.changes.map(describeChange)).toEqual([
       "update api Bug→bug [name,color]",
       "update cli bug→bug [description]",
       "create empty bug #d73a4a",
     ]);
-    expect(buildPlan(table, { rows: ["bug"], edits: new Map(), add: false, update: true }).changes).toHaveLength(2);
-    expect(buildPlan(table, { rows: ["bug"], edits: new Map(), add: true, update: false }).changes.map(describeChange)).toEqual(["create empty bug #d73a4a"]);
+    expect(buildPlan(table, { repos: allRepos(table), rows: ["bug"], edits: new Map(), add: false, update: true }).changes).toHaveLength(2);
+    expect(buildPlan(table, { repos: allRepos(table), rows: ["bug"], edits: new Map(), add: true, update: false }).changes.map(describeChange)).toEqual(["create empty bug #d73a4a"]);
     expect(plan.skipped).toEqual([]);
   });
 
   it("予定: 別の名前へ変えるときは、変更後の行の基準の値にし、すでにその名前があるリポジトリは飛ばす", () => {
     const edits = new Map<string, RowEdit>([["type: bug", { renameTo: "bug" }]]);
     // api には Bug があるので飛ばす
-    const plan = buildPlan(table, { rows: ["type: bug"], edits, add: true, update: true });
+    const plan = buildPlan(table, { repos: allRepos(table), rows: ["type: bug"], edits, add: true, update: true });
     expect(plan.changes).toEqual([]);
     expect(plan.skipped.map((s) => `${s.repo.name} ${s.current.name}→${s.target}`)).toEqual(["api type: bug→bug"]);
 
     const t2 = buildTable([source("a", label("a", "type: bug", "000000")), source("b", label("b", "bug", "d73a4a", "B"))]);
-    const p2 = buildPlan(t2, { rows: ["type: bug", "bug"], edits: new Map([["type: bug", { renameTo: "bug" }]]), add: true, update: true });
+    const p2 = buildPlan(t2, { repos: allRepos(t2), rows: ["type: bug", "bug"], edits: new Map([["type: bug", { renameTo: "bug" }]]), add: true, update: true });
     // a の type: bug を bug へ変えるので、a に bug は追加しない
     expect(p2.changes.map(describeChange)).toEqual(["update a type: bug→bug [name,color,description]"]);
     expect(p2.changes[0]!.next).toEqual({ name: "bug", color: "d73a4a", description: "B" });
   });
 
+  it("予定: 対象のリポジトリにだけ送る。対象が無ければ何も送らない", () => {
+    const only = (...keys: string[]) => buildPlan(table, { repos: new Set(keys), rows: ["bug", "type: bug"], edits: new Map([["type: bug", { renameTo: "kind: bug" }]]), add: true, update: true });
+    expect(only("acme/empty").changes.map(describeChange)).toEqual(["create empty bug #d73a4a"]);
+    expect(only("acme/api").changes.map(describeChange)).toEqual(["update api type: bug→kind: bug [name]", "update api Bug→bug [name,color]"]);
+    expect(only()).toEqual({ changes: [], skipped: [] });
+  });
+
+  it("削除の対象は、選んだラベルのうち対象のリポジトリにあるもの（行・列の順）", () => {
+    const targets = deletionTargets(table, ["type: bug", "bug"], new Set(["acme/api", "acme/web", "acme/empty"]));
+    expect(targets.map((l) => `${l.repo.name}:${l.name}`)).toEqual(["api:Bug", "web:bug", "api:type: bug"]);
+    expect(deletionTargets(table, ["bug"], new Set())).toEqual([]);
+  });
+
   it("予定: まだどこにも無い名前へ変えるときは、この行の色と説明を使う。同じリポジトリで同じ名前へ 2 つ変えるなら後のものは飛ばす", () => {
     const t = buildTable([source("a", label("a", "defect", "111111", "d"), label("a", "Defect!", "222222"))]);
-    const plan = buildPlan(t, {
+    const plan = buildPlan(t, { repos: allRepos(t),
       rows: ["defect", "defect!"],
       edits: new Map([["defect", { renameTo: "kind: bug" }], ["defect!", { renameTo: "Kind: Bug" }]]),
       add: true,
@@ -101,6 +115,24 @@ describe("ラベルの表", () => {
 });
 
 describe("GitHub とのやり取り", () => {
+  it("削除は 1 件ずつ順に DELETE を送る。すでに無い（404）ものは成功とみなし、ほかの失敗では止めない", async () => {
+    const { http, calls } = testHttp((c) =>
+      c.url.pathname.includes("/gone/")
+        ? json({ message: "Not Found" }, { status: 404 })
+        : c.url.pathname.includes("/locked/")
+          ? json({ message: "Resource not accessible by personal access token" }, { status: 403 })
+          : new Response(null, { status: 204 }),
+    );
+    const f = createLabelsFeature({ source: createGitHubLabelSource(() => http) });
+    const res = await f.remove([label("gone", "bug"), label("locked", "bug"), label("web", "type: bug")]);
+    expect(res.map((r) => r.ok)).toEqual([true, false, true]);
+    expect(calls.map((c) => `${c.method} ${c.url.pathname}`)).toEqual([
+      "DELETE /repos/acme/gone/labels/bug",
+      "DELETE /repos/acme/locked/labels/bug",
+      "DELETE /repos/acme/web/labels/type%3A%20bug",
+    ]);
+  });
+
   it("一覧はリポジトリごとに読み、アーカイブ済みのリポジトリは呼ばない。色は小文字、説明の null は空にする", async () => {
     const { http, calls } = testHttp(() => json([{ id: 1, name: "bug", color: "D73A4A", description: null, default: true }]));
     const f = createLabelsFeature({ source: createGitHubLabelSource(() => http) });

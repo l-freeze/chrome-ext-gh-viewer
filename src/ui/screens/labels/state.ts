@@ -1,16 +1,31 @@
-// ラベルのそろえ込みの状態: 取得、絞り込み、行ごとの基準と名前の変更、選択、確認 → 変更中 → 結果。
+// ラベルのそろえ込みの状態: 取得、絞り込み、行ごとの基準と名前の変更、選択、対象のリポジトリ、確認 → 変更中 → 結果。
 // 確認の段階を経ないと変更を送らない。確認中と変更中は取り直さない（確認した予定が変わらないように）。
+// 対象のリポジトリは、チェックを入れたものだけ（最初は空。保存しない）。
+// 削除は 2 段階の確認を経る: 元に戻せないことの確認 → delete と入力しての確認。確認した対象をそのまま削除する。
 
 import { batch, createMemo, createSignal, type Accessor } from "solid-js";
 import type { Label } from "../../../features/labels/label";
-import { buildPlan, buildTable, hasDifference, referenceOf, type LabelChange, type LabelRow, type RowEdit } from "../../../features/labels/sync";
+import { buildPlan, buildTable, deletionTargets, hasDifference, referenceOf, type LabelChange, type LabelRow, type RowEdit } from "../../../features/labels/sync";
 import { repoKey, toRepoRef, type Repository } from "../../../features/workspace/repository";
 import type { UiDeps } from "../../app/context";
 import type { WorkspaceState } from "../../app/workspace";
 import { createRepoResults } from "../../lists/repo-results";
 
-export type ApplyPhase = { phase: "idle" } | { phase: "confirm" } | { phase: "applying"; done: number; total: number };
-export type LabelNotice = { kind: "applied"; count: number } | { kind: "failed"; count: number; total: number; errors: unknown[] };
+export type ApplyPhase =
+  | { phase: "idle" }
+  | { phase: "confirm" }
+  | { phase: "applying"; done: number; total: number }
+  | { phase: "deleteWarn" }
+  | { phase: "deleteConfirm" }
+  | { phase: "deleting"; done: number; total: number };
+export type LabelNotice =
+  | { kind: "applied"; count: number }
+  | { kind: "failed"; count: number; total: number; errors: unknown[] }
+  | { kind: "deleted"; count: number }
+  | { kind: "deleteFailed"; count: number; total: number; errors: unknown[]; remaining: Label[] };
+
+/** 削除の 2 段階目で入力する語 */
+export const DELETE_WORD = "delete";
 
 export function createLabelsState(deps: UiDeps, ws: WorkspaceState, active: Accessor<boolean>) {
   const ops = deps.manager.labels;
@@ -22,6 +37,9 @@ export function createLabelsState(deps: UiDeps, ws: WorkspaceState, active: Acce
   const [update, setUpdate] = createSignal(true);
   const [phase, setPhase] = createSignal<ApplyPhase>({ phase: "idle" });
   const [notice, setNotice] = createSignal<LabelNotice | null>(null);
+  const [targets, setTargets] = createSignal<ReadonlySet<string>>(new Set());
+  const [toDelete, setToDelete] = createSignal<readonly Label[]>([]);
+  const [deleteWord, setDeleteWord] = createSignal("");
 
   const results = createRepoResults<Label[]>({
     ws,
@@ -32,6 +50,7 @@ export function createLabelsState(deps: UiDeps, ws: WorkspaceState, active: Acce
       batch(() => {
         setSelected(new Set<string>());
         setEdits(new Map());
+        setTargets(new Set<string>());
       }),
     paused: (): boolean => phase().phase !== "idle",
   });
@@ -49,7 +68,10 @@ export function createLabelsState(deps: UiDeps, ws: WorkspaceState, active: Acce
   });
   const diffCount = createMemo(() => table().rows.filter(differs).length);
   const selectedKeys = createMemo(() => table().rows.filter((r) => selected().has(r.key)).map((r) => r.key));
-  const plan = createMemo(() => buildPlan(table(), { rows: selectedKeys(), edits: edits(), add: add(), update: update() }));
+  // 表に無くなったリポジトリ（所有者を外したなど）は対象から除く
+  const targetKeys = createMemo(() => new Set(table().columns.map((c) => c.key).filter((k) => targets().has(k))));
+  const plan = createMemo(() => buildPlan(table(), { rows: selectedKeys(), repos: targetKeys(), edits: edits(), add: add(), update: update() }));
+  const deletable = createMemo(() => deletionTargets(table(), selectedKeys(), targetKeys()));
 
   const editRow = (key: string, fn: (edit: RowEdit) => RowEdit) =>
     setEdits((m) => {
@@ -79,6 +101,37 @@ export function createLabelsState(deps: UiDeps, ws: WorkspaceState, active: Acce
         failed.length === 0
           ? { kind: "applied", count: res.length }
           : { kind: "failed", count: failed.length, total: res.length, errors: failed.map((r) => (r.ok ? null : r.error)) },
+      );
+    });
+    results.reload(repos);
+  }
+
+  async function remove() {
+    const labels = toDelete();
+    if (phase().phase !== "deleteConfirm" || deleteWord().trim() !== DELETE_WORD || labels.length === 0) return;
+    setPhase({ phase: "deleting", done: 0, total: labels.length });
+    const res = await ops.remove(labels, { onProgress: (p) => setPhase({ phase: "deleting", ...p }) });
+    const failed = res.filter((r) => !r.ok);
+    const touched = new Set(labels.map((l) => repoKey(l.repo)));
+    const repos: Repository[] = sources()
+      .map((r) => r.repo)
+      .filter((r) => touched.has(repoKey(toRepoRef(r))));
+    batch(() => {
+      setPhase({ phase: "idle" });
+      setToDelete([]);
+      setDeleteWord("");
+      setSelected(new Set<string>());
+      setEdits(new Map());
+      setNotice(
+        failed.length === 0
+          ? { kind: "deleted", count: res.length }
+          : {
+              kind: "deleteFailed",
+              count: failed.length,
+              total: res.length,
+              errors: failed.map((r) => (r.ok ? null : r.error)),
+              remaining: failed.map((r) => r.item),
+            },
       );
     });
     results.reload(repos);
@@ -127,8 +180,40 @@ export function createLabelsState(deps: UiDeps, ws: WorkspaceState, active: Acce
     plan,
     phase,
     review: () => plan().changes.length > 0 && setPhase({ phase: "confirm" }),
-    cancel: () => setPhase({ phase: "idle" }),
+    cancel: () =>
+      batch(() => {
+        setPhase({ phase: "idle" });
+        setToDelete([]);
+        setDeleteWord("");
+      }),
     apply,
+    isTarget: (columnKey: string) => targetKeys().has(columnKey),
+    toggleTarget: (columnKey: string) =>
+      setTargets((s) => {
+        const next = new Set(s);
+        if (!next.delete(columnKey)) next.add(columnKey);
+        return next;
+      }),
+    setAllTargets: (checked: boolean) => setTargets(new Set(checked ? table().columns.map((c) => c.key) : [])),
+    targetCount: () => targetKeys().size,
+    deletable,
+    /** 削除の 1 段階目: 対象をここで決め、以後はこの対象だけを削除する */
+    askDelete: () => {
+      const labels = deletable();
+      if (phase().phase !== "idle" || labels.length === 0) return;
+      batch(() => {
+        setToDelete(labels);
+        setDeleteWord("");
+        setPhase({ phase: "deleteWarn" });
+      });
+    },
+    toDelete,
+    /** 削除の 2 段階目へ（元に戻せないことを確かめた） */
+    acknowledgeDelete: () => phase().phase === "deleteWarn" && setPhase({ phase: "deleteConfirm" }),
+    deleteWord,
+    setDeleteWord,
+    canDelete: () => deleteWord().trim() === DELETE_WORD,
+    remove,
     notice,
     dismissNotice: () => setNotice(null),
   };
