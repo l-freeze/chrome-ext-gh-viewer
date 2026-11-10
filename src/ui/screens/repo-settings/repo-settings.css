@@ -1,0 +1,89 @@
+/* ---- リポジトリの設定の違いの表 --------------------------------------------------- */
+/* ほかの画面の CSS には依存しない。共通で使うのは .table・.table-wrap・.filters・.field の基本の見た目だけ */
+
+.repo-settings__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  height: 34px;
+  color: var(--text-2);
+  cursor: pointer;
+}
+.repo-settings__count {
+  margin: 0 0 0 auto;
+}
+.repo-settings__note {
+  margin: -4px 0 12px;
+}
+
+/* 列が多いと枠の中で横にスクロールする。リポジトリの列は左に固定する。
+   セルの中の読み上げ用の文字（絶対配置）がページをはみ出させないよう、スクロールする枠を基準にする */
+.repo-settings__wrap {
+  position: relative;
+}
+.table--repo-settings {
+  width: auto;
+  min-width: 100%;
+}
+.table--repo-settings th,
+.table--repo-settings td {
+  height: 34px;
+  border-right: 1px solid var(--border);
+}
+.table--repo-settings .repo-settings__repo {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 180px;
+  background: var(--surface);
+  font-weight: 500;
+}
+.table--repo-settings thead .repo-settings__repo {
+  z-index: 2;
+  background: var(--surface-2);
+  font-weight: 600;
+  vertical-align: bottom;
+}
+.table--repo-settings .repo-settings__repo a {
+  color: var(--text);
+}
+.table--repo-settings .repo-settings__group {
+  text-align: center;
+}
+.table--repo-settings .repo-settings__setting {
+  min-width: 72px;
+  max-width: 120px;
+  font-weight: 400;
+  line-height: 1.3;
+  text-align: center;
+  white-space: normal;
+  vertical-align: bottom;
+  padding-top: 4px;
+  padding-bottom: 4px;
+}
+.repo-settings__majority th,
+.repo-settings__majority td {
+  background: var(--surface-2) !important;
+  font-weight: 600;
+}
+.repo-settings__cell {
+  text-align: center !important;
+  font-size: 13px;
+}
+.repo-settings__cell--differs {
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+}
+.repo-settings__cell--differs .muted {
+  color: var(--warn);
+}
+.repo-settings__on {
+  color: var(--accent);
+}
+.repo-settings__cell--differs .repo-settings__on {
+  color: var(--warn);
+}
+.repo-settings__on .icon {
+  vertical-align: middle;
+}
