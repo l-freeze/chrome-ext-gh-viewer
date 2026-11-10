@@ -1,0 +1,216 @@
+/* ---- ラベルのそろえ込み --------------------------------------------------------- */
+/* ほかの画面の CSS には依存しない。共通で使うのは .table・.table-wrap・.filters・.field・.button の基本の見た目だけ */
+
+.labels__option {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--text-2);
+  font-weight: 400;
+  cursor: pointer;
+}
+.labels__option--filter {
+  height: 34px;
+}
+.labels__count {
+  margin: 0 0 0 auto;
+}
+.labels__note {
+  margin: -4px 0 6px;
+}
+.labels__legend {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 16px;
+  margin: 0 0 12px;
+  padding: 0;
+  list-style: none;
+  color: var(--text-2);
+}
+.labels__legend li {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.labels__key {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 18px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+}
+.labels__key.labels__cell--differs,
+.labels__key.labels__cell--missing {
+  border-color: var(--warn);
+}
+.labels .button--small {
+  height: 26px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+
+/* 変更の予定（確認の帯の中） */
+.labels__plan {
+  max-height: 240px;
+  margin: 4px 0 0;
+  padding: 0 0 0 20px;
+  overflow-y: auto;
+  color: var(--text);
+  font-size: 13px;
+  font-weight: 400;
+}
+.labels__plan li {
+  overflow-wrap: anywhere;
+}
+.labels__plan-skip {
+  color: var(--warn);
+}
+
+/* 表。列が多いと枠の中で横にスクロールし、ラベルの列は左に固定する。
+   セルの中の読み上げ用の文字（絶対配置）がページをはみ出させないよう、スクロールする枠を基準にする */
+.labels__wrap {
+  position: relative;
+}
+.table--labels {
+  width: auto;
+  min-width: 100%;
+}
+.table--labels th,
+.table--labels td {
+  height: 36px;
+  border-right: 1px solid var(--border);
+}
+.table--labels .labels__name {
+  position: sticky;
+  left: 0;
+  z-index: 1;
+  min-width: 200px;
+  max-width: 320px;
+  padding-top: 6px;
+  padding-bottom: 6px;
+  background: var(--surface);
+  font-weight: 400;
+  white-space: normal;
+}
+.table--labels thead .labels__name {
+  z-index: 2;
+  background: var(--surface-2);
+  font-weight: 600;
+}
+.table--labels .row--selected .labels__name {
+  background: var(--selected);
+}
+.labels__name-line {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+}
+.labels__rename {
+  margin-left: auto;
+}
+.labels__rename-to {
+  font-size: 12px;
+  color: var(--text-2);
+  overflow-wrap: anywhere;
+}
+.labels__desc {
+  margin: 2px 0 0 22px;
+  overflow-wrap: anywhere;
+}
+.labels__rename-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.labels__rename-form input[type="text"] {
+  flex: 1 1 140px;
+  min-width: 0;
+  height: 26px;
+  padding: 0 6px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+.table--labels .labels__repo {
+  min-width: 96px;
+  text-align: center;
+}
+.table--labels .labels__repo a {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.label-pill {
+  display: inline-block;
+  max-width: 100%;
+  padding: 0 8px;
+  border-radius: 999px;
+  font-size: 12px;
+  font-weight: 500;
+  line-height: 20px;
+  overflow-wrap: anywhere;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.12);
+}
+
+/* セル: 基準と同じ・違う・無い。違うところと無いところは警告の色で目立たせる */
+.labels__cell {
+  padding: 0 !important;
+  text-align: center !important;
+}
+.labels__cell--missing {
+  background: var(--warn-soft);
+  color: var(--warn);
+  font-weight: 600;
+}
+.labels__cell--differs {
+  background: var(--warn-soft);
+}
+.labels__cell-button {
+  display: inline-flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  width: 100%;
+  min-height: 36px;
+  padding: 4px 6px;
+  border: 0;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+}
+.labels__cell-button:hover:not(:disabled) {
+  background: var(--surface-2);
+}
+.labels__cell-button:disabled {
+  cursor: default;
+}
+.labels__cell--reference {
+  box-shadow: inset 0 0 0 2px var(--accent);
+}
+.labels__swatch {
+  display: inline-block;
+  width: 16px;
+  height: 16px;
+  border-radius: 50%;
+  box-shadow: inset 0 0 0 1px rgb(0 0 0 / 0.15);
+}
+.labels__diff {
+  color: var(--warn);
+  font-size: 11px;
+  line-height: 1.2;
+  white-space: normal;
+}
+.labels__ref-mark {
+  color: var(--accent);
+  font-size: 11px;
+  font-weight: 600;
+  line-height: 1.2;
+}
