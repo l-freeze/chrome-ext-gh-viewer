@@ -16,6 +16,7 @@ src/
 │   ├── releases/             Release の一覧と添付ファイルのダウンロード（閲覧のみ）
 │   ├── secrets/              Actions のシークレットと変数の一覧と比較表（閲覧のみ。Secrets & Variables タブの List と Matrix）
 │   ├── issues/               Issue の横断検索（Issue タブの List）
+│   ├── labels/               ラベルのリポジトリ横断の比較と、追加・名前・色・説明の統一（Labels タブ）
 │   ├── preferences/          画面をまたぐ表示の好み（自動更新のオン・オフ）
 │   └── projects/             Projects のカンバンと、項目の Status の変更（Issue タブの Kanban）
 ├── integrations/github/      GitHub という外部サービスの約束ごと
@@ -100,6 +101,9 @@ ui/
 - 既存の機能を組み合わせて見せるだけ → `screens/` に画面だけを足す
 
 例: Issue タブの Kanban は、Projects という新しい API の分野とモデル（プロジェクト・列・項目）を扱うため、`features/projects` と `screens/kanban` を足しています。List（`features/issues` と `screens/issues`）とは独立しています。
+
+例: Labels タブは、ラベルという新しい API の分野と、比較・変更の予定（`features/labels/sync.ts`）を扱うため、`features/labels` と `screens/labels` を足しています。
+Issue の機能（`features/issues`）とは独立しています。変更は確認の段階を経てから、GitHub の書き込みの制限に触れないよう 1 件ずつ送ります。
 
 例: Secrets & Variables タブの Matrix（比較表）は、一覧と同じ取得結果を並べ直すだけなので、新しい機能は足していません。
 行列を組み立てる規則を `features/secrets/matrix.ts` に、画面を `screens/secrets/MatrixScreen.tsx` と `matrix-state.ts` に置いています。
