@@ -230,12 +230,28 @@ async function connected(page, id, opts) {
     await typeBug.getByRole("button", { name: "OK" }).click();
     await bug.getByRole("checkbox").check();
     await typeBug.getByRole("checkbox").check();
-    await shot(page, "Labels", "63-labels-selected.png", "2 つを選んだところ（追加とそろえ込みを選べる）");
+    await shot(page, "Labels", "63a-labels-no-targets.png", "対象のリポジトリにまだチェックが無いところ（何も送れない）");
+    await page.getByLabel("All repositories").check();
+    await shot(page, "Labels", "63-labels-selected.png", "2 つを選び、対象のリポジトリをすべて入れたところ");
     await page.getByRole("button", { name: /^Review/ }).click();
     await shot(page, "Labels", "64-labels-confirm.png", "変更の予定の確認（すでに名前があるリポジトリは飛ばす）");
     await page.getByRole("button", { name: /^Apply/ }).click();
     await page.getByText(/^Applied/).waitFor();
     await shot(page, "Labels", "65-labels-applied.png", "変更のあと（送ったリポジトリだけ取り直す）");
+    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByLabel("All repositories").uncheck();
+    await page.getByLabel("Target acme-labs/data-pipeline").check();
+    await page.getByLabel("Target octo-dev/tile-game").check();
+    for (const name of ["enhancement", "priority: high"]) await rows.filter({ has: page.locator(".label-pill", { hasText: name }) }).getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await shot(page, "Labels", "66-labels-delete-warn.png", "削除の 1 段目（元に戻せないことの確認と対象の一覧）");
+    await page.getByRole("button", { name: "I understand" }).click();
+    await shot(page, "Labels", "67-labels-delete-confirm.png", "削除の 2 段目（delete と入力するまで押せない）");
+    await page.getByLabel("Type delete to continue.").fill("delete");
+    await shot(page, "Labels", "68-labels-delete-typed.png", "削除の 2 段目（入力したところ）");
+    await page.getByRole("button", { name: /^Delete \d+ labels?$/ }).click();
+    await page.getByText(/^Deleted/).waitFor();
+    await shot(page, "Labels", "69-labels-deleted.png", "削除のあと");
     await context.close();
   }
 
@@ -261,7 +277,13 @@ async function connected(page, id, opts) {
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
+    await page.getByLabel("All repositories").check();
     await shot(page, "Dark", "38-dark-labels.png", "ダーク: Labels（1 つ選択中）");
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await shot(page, "Dark", "38a-dark-labels-delete-warn.png", "ダーク: Labels の削除の 1 段目");
+    await page.getByRole("button", { name: "I understand" }).click();
+    await shot(page, "Dark", "38b-dark-labels-delete-confirm.png", "ダーク: Labels の削除の 2 段目");
+    await page.getByRole("button", { name: "Cancel" }).click();
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "Dark", "33-dark-settings.png", "ダーク: 設定");
@@ -299,9 +321,17 @@ async function connected(page, id, opts) {
     {
       const rows = page.locator("table.table--labels tbody tr");
       await rows.filter({ has: page.locator(".label-pill", { hasText: /^bug$/ }) }).getByRole("checkbox").check();
+      await shot(page, "日本語", "48a-ja-labels-no-targets.png", "日本語: Labels（対象のリポジトリが無い）");
+      await page.getByLabel("すべてのリポジトリ").check();
       await shot(page, "日本語", "48-ja-labels.png", "日本語: Labels（1 つ選択中）");
       await page.getByRole("button", { name: /件の変更を確認/ }).click();
       await shot(page, "日本語", "49-ja-labels-confirm.png", "日本語: Labels の変更の確認");
+      await page.getByRole("button", { name: "キャンセル" }).click();
+      await page.getByRole("button", { name: "削除", exact: true }).click();
+      await shot(page, "日本語", "49a-ja-labels-delete-warn.png", "日本語: Labels の削除の 1 段目");
+      await page.getByRole("button", { name: "内容を確認しました" }).click();
+      await page.getByLabel("続けるには delete と入力してください。").fill("delete");
+      await shot(page, "日本語", "49b-ja-labels-delete-confirm.png", "日本語: Labels の削除の 2 段目");
       await page.getByRole("button", { name: "キャンセル" }).click();
     }
     await page.goto(url(id, "#settings"));
@@ -340,11 +370,18 @@ async function connected(page, id, opts) {
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
+    await page.getByLabel("All repositories").check();
     await shot(page, "狭い画面（幅 420px）", "58-narrow-labels.png", "幅 420px: Labels（表は枠の中で横にスクロールし、ラベルの列は左に固定）");
     console.log("narrow labels horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
     await page.getByRole("button", { name: /^Review/ }).click();
     await shot(page, "狭い画面（幅 420px）", "59-narrow-labels-confirm.png", "幅 420px: Labels の変更の確認");
     console.log("narrow labels confirm horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await shot(page, "狭い画面（幅 420px）", "59a-narrow-labels-delete-warn.png", "幅 420px: Labels の削除の 1 段目");
+    await page.getByRole("button", { name: "I understand" }).click();
+    await shot(page, "狭い画面（幅 420px）", "59b-narrow-labels-delete-confirm.png", "幅 420px: Labels の削除の 2 段目");
+    console.log("narrow labels delete horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
     await page.getByRole("button", { name: "Cancel" }).click();
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
