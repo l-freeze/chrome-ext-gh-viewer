@@ -17,7 +17,9 @@
   - 基準は、名前・色・説明のそれぞれでいちばん多い値です。マスを押すと、そのリポジトリの値を基準にできます
   - ラベルを選び、足りないリポジトリへの追加と、名前（大文字と小文字）・色・説明の統一をまとめて行えます。どちらかだけにもできます
   - 名前の変更もできます（付いている Issue と PR からは外れません）。変更後の名前がすでにあるリポジトリは、GitHub が受け付けないので飛ばします
-  - 変更は、予定を確認してから 1 件ずつ送り、送ったリポジトリだけを取り直します。削除はできません。アーカイブ済みのリポジトリは対象外です
+  - 変更と削除を送るのは、列の見出しでチェックを入れたリポジトリだけです（最初はどれも入っていません。チェックは保存しません）
+  - ラベルの削除もできます。削除は 2 段階で確認します。1 段目で、付いているすべての Issue と PR から外れて元に戻らないことと、削除するもの（リポジトリとラベル）の一覧を示し、2 段目で `delete` と入力するまで削除のボタンを押せません。削除できなかったものは、残っているラベルとして示します
+  - 変更と削除は、確認してから 1 件ずつ送り、送ったリポジトリだけを取り直します。アーカイブ済みのリポジトリは対象外です
 - 開いているタブの情報を自動で取り直します。上部の「自動更新」で切り替えられ、既定はオンです。オフでも再読み込みボタンはいつでも使えます
   - Issue の List は 1 分ごと、Kanban は 2 分ごと、シークレットと変数・ラベルは 1 日ごと
   - Artifacts・Caches・Releases・Actions は、選んでいるリポジトリの数から間隔を決めます。1 時間あたりの呼び出しを API の上限（5,000 回）の 1 割に収めるように切り上げ、最短 5 分です（例: 100 リポジトリならアーティファクトは 12 分ごと、Actions は 24 分ごと）
@@ -50,7 +52,7 @@ Chrome ウェブストアには未公開のため、GitHub Actions がビルド�
 | GitHub でログイン（OAuth Device Flow） | github.com でコードを入力して承認します。ビルド時に OAuth App の Client ID が必要です |
 | Personal Access Token | Classic（`repo`, `read:org`, `project`）または Fine-grained（Actions: Read and write、Contents: Read、Issues: Read and write、Members: Read、Environments: Read、Secrets: Read、Variables: Read、Organization の Projects: Read and write）。Fine-grained は所有者ごとに 1 つ追加します |
 
-Fine-grained の Issues の Write はラベルの追加と変更に使います（読むだけなら Read で足ります）。Contents: Read はワークフローの定義とブランチを読むため、Environments: Read は `environment` 型の入力を選択肢で出すために使います。Environments を読めない場合は自由入力になります。
+Fine-grained の Issues の Write はラベルの追加・変更・削除に使います（読むだけなら Read で足ります）。Contents: Read はワークフローの定義とブランチを読むため、Environments: Read は `environment` 型の入力を選択肢で出すために使います。Environments を読めない場合は自由入力になります。
 
 カンバンには `project` スコープ（Fine-grained では Organization の Projects 権限）が必要です。このスコープを追加する前に GitHub でログインした場合は、一度ログアウトしてログインし直してください。個人アカウントのプロジェクトを Fine-grained PAT で扱えるかは確認できていません。
 
