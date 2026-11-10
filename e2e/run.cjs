@@ -376,6 +376,110 @@ const step = async (name, fn) => {
     await page.locator("table.table--secrets").getByText("DEPLOY_KEY").waitFor();
   });
 
+  await step("Labels: リポジトリごとのラベルを並べ、違いと無いところを示す（アーカイブ済みと読めないリポジトリは列にしない）", async () => {
+    const before = log.length;
+    await page.getByRole("link", { name: /^Labels/ }).click();
+    const table = page.locator("table.table--labels");
+    await table.locator(".label-pill", { hasText: "priority: high" }).waitFor();
+    await page.getByText("5 labels").waitFor();
+    assert.deepEqual(await table.locator("thead .labels__repo").allInnerTexts(), [
+      "acme-labs/data-pipeline", "acme-labs/mobile-app", "acme-labs/web-console", "octo-dev/dotfiles", "octo-dev/tile-game",
+    ]);
+    assert.equal(await table.locator("tbody tr").count(), 5);
+    await page.getByText("1 repository could not be read").waitFor();
+    // bug: 基準はいちばん多い値（bug・d73a4a・説明あり）。mobile-app は説明が無く、web-console は名前と色が違い、dotfiles には無い
+    const bug = table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: /^bug$/ }) });
+    const states = () => bug.locator("td").evaluateAll((cells) => cells.map((c) => c.className.match(/labels__cell--(\w+)/)[1]));
+    assert.deepEqual(await states(), ["same", "differs", "differs", "missing", "same"]);
+    await bug.locator("td").nth(2).getByText("name, color").waitFor();
+    // 読むだけでは書き込まない
+    assert.deepEqual(control.labelWrites, []);
+    assert.ok(log.slice(before).every((l) => l.startsWith("GET ")));
+    await page.screenshot({ path: path.join(OUT, "06h-labels.png") });
+  });
+
+  await step("Labels: 選んだラベルの変更の予定を確かめてから送り、送ったリポジトリだけ取り直す", async () => {
+    const table = page.locator("table.table--labels");
+    const bug = table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: /^bug$/i }) }).first();
+    await bug.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Review 3 changes" }).waitFor();
+    // 追加をやめると、追加の分が予定から外れる
+    await page.getByLabel("Add missing labels").uncheck();
+    await page.getByRole("button", { name: "Review 2 changes" }).waitFor();
+    await page.getByLabel("Add missing labels").check();
+    // web-console の値を基準にすると、ほかの 3 つを変えることになる。もう一度押すと元に戻る
+    await bug.locator("td").nth(2).getByRole("button").click();
+    await page.getByRole("button", { name: "Review 4 changes" }).waitFor();
+    await bug.locator("td").nth(2).getByRole("button").click();
+    await page.getByRole("button", { name: "Review 3 changes" }).waitFor();
+
+    // type: bug を bug へ: web-console にはすでに Bug があるので、送らずに飛ばす
+    const typeBug = table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: "type: bug" }) });
+    await typeBug.getByRole("button", { name: "Rename" }).click();
+    await typeBug.getByLabel("New name").fill("bug");
+    await typeBug.getByRole("button", { name: "OK" }).click();
+    await typeBug.getByText("→").waitFor();
+    await typeBug.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Review 3 changes" }).click();
+    const plan = page.locator(".labels__plan li");
+    assert.deepEqual(await plan.allInnerTexts(), [
+      "Change description of bug in acme-labs/mobile-app",
+      "Change name, color of Bug in acme-labs/web-console",
+      "Add bug to octo-dev/dotfiles",
+      "Skip acme-labs/web-console: it already has bug, so type: bug is not renamed",
+    ]);
+    await page.screenshot({ path: path.join(OUT, "06i-labels-confirm.png") });
+    assert.deepEqual(control.labelWrites, []);
+
+    const before = log.length;
+    await page.getByRole("button", { name: "Apply 3 changes" }).click();
+    await page.getByText("Applied 3 changes.").waitFor();
+    assert.deepEqual(control.labelWrites, [
+      `PATCH acme-labs/mobile-app bug {"new_name":"bug","color":"d73a4a","description":"Something isn't working"}`,
+      `PATCH acme-labs/web-console Bug {"new_name":"bug","color":"d73a4a","description":"Something isn't working"}`,
+      `POST octo-dev/dotfiles {"name":"bug","color":"d73a4a","description":"Something isn't working"}`,
+    ]);
+    // 変えた 3 リポジトリだけ取り直す
+    await page.getByText("4 labels").waitFor();
+    const reads = log.slice(before).filter((l) => l.startsWith("GET ") && l.includes("/labels"));
+    assert.deepEqual(reads.map((l) => l.split("?")[0]).sort(), [
+      "GET /repos/acme-labs/mobile-app/labels", "GET /repos/acme-labs/web-console/labels", "GET /repos/octo-dev/dotfiles/labels",
+    ]);
+    // そろった bug は「違いのあるラベルだけ」では出ない
+    assert.equal(await table.locator(".label-pill", { hasText: /^bug$/ }).count(), 0);
+    await page.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("Labels: まだ無い名前へ変える。送れなかったら必要な権限を示す", async () => {
+    const table = page.locator("table.table--labels");
+    const typeBug = table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: "type: bug" }) });
+    await typeBug.getByRole("button", { name: "Rename" }).click();
+    await typeBug.getByLabel("New name").fill("   ");
+    await typeBug.getByRole("button", { name: "OK" }).click();
+    await typeBug.getByText("Enter a name.").waitFor();
+    await typeBug.getByLabel("New name").fill("kind: bug");
+    await typeBug.getByRole("button", { name: "OK" }).click();
+    await typeBug.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Review 1 change" }).click();
+    assert.deepEqual(await page.locator(".labels__plan li").allInnerTexts(), ["Rename type: bug to kind: bug in acme-labs/web-console"]);
+    await page.getByRole("button", { name: "Apply 1 change" }).click();
+    await page.getByText("Applied 1 change.").waitFor();
+    assert.equal(control.labelWrites.at(-1), `PATCH acme-labs/web-console type: bug {"new_name":"kind: bug","color":"d73a4a","description":"Bug reports"}`);
+    await table.locator(".label-pill", { hasText: "kind: bug" }).waitFor();
+    await page.getByRole("button", { name: "Close" }).click();
+
+    control.failLabelWrites = true;
+    const good = table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: "good first issue" }) });
+    await good.getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Review 4 changes" }).click();
+    await page.getByRole("button", { name: "Apply 4 changes" }).click();
+    await page.getByText(/^4 of 4 changes failed\./).waitFor();
+    await page.locator(".permission-hint li", { hasText: "Issues: Read and write" }).waitFor();
+    await page.screenshot({ path: path.join(OUT, "06j-labels-failed.png") });
+    control.failLabelWrites = false;
+    await page.getByRole("button", { name: "Close" }).click();
+  });
+
   await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {
     await page.getByRole("link", { name: /^Actions/ }).click();
     await page.getByRole("link", { name: "Deploy", exact: true }).waitFor();

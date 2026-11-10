@@ -263,7 +263,32 @@ const releasesByRepo = {
   "octo-dev/tile-game": [releaseOf("v0.9.0", "Beta", 5, { prerelease: true, assets: [["tile-game-web.zip", 18 * MB, 4]] })],
 };
 
+// リポジトリごとのラベル。web-console の Bug は大文字で色が違い、mobile-app の bug は説明がない。dotfiles にはラベルがない。
+// secret-service は読めない（403）
+let labelId = 7000;
+const repoLabel = (name, color, description = null) => ({ id: labelId++, name, color, description, default: false });
+const labelsByRepo = {
+  "acme-labs/data-pipeline": [
+    repoLabel("bug", "d73a4a", "Something isn't working"),
+    repoLabel("enhancement", "a2eeef", "New feature or request"),
+    repoLabel("priority: high", "b60205"),
+  ],
+  "acme-labs/web-console": [
+    repoLabel("Bug", "ff0000", "Something isn't working"),
+    repoLabel("enhancement", "a2eeef", "New feature or request"),
+    repoLabel("type: bug", "d73a4a", "Bug reports"),
+  ],
+  "acme-labs/mobile-app": [repoLabel("bug", "d73a4a"), repoLabel("enhancement", "a2eeef", "New feature or request")],
+  "octo-dev/dotfiles": [],
+  "octo-dev/tile-game": [
+    repoLabel("bug", "d73a4a", "Something isn't working"),
+    repoLabel("enhancement", "a2eeef", "New feature or request"),
+    repoLabel("good first issue", "7057ff", "Good for newcomers"),
+  ],
+};
+
 module.exports = {
+  labelsByRepo,
   archivedRunsByRepo,
   releasesByRepo,
   configByRepo,
