@@ -130,6 +130,33 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       const list = scope?.[m[4]] ?? [];
       return json(route, { total_count: list.length, [m[4]]: list });
     }
+    m = /^\/repos\/([^/]+)\/([^/]+)\/labels(?:\/([^/]+))?$/.exec(p);
+    if (m) {
+      const key = `${m[1]}/${m[2]}`;
+      if (key === "locked-corp/secret-service")
+        return json(route, { message: "Resource not accessible by personal access token" }, 403, { "x-accepted-github-permissions": "issues=read" });
+      const list = (control.labels[key] ??= []);
+      const find = (name) => list.find((l) => l.name.toLowerCase() === name.toLowerCase());
+      const exists = () => json(route, { message: "Validation Failed", errors: [{ resource: "Label", code: "already_exists", field: "name" }] }, 422);
+      if (req.method() === "GET") return json(route, list);
+      const body = JSON.parse(req.postData() ?? "{}");
+      control.labelWrites.push(`${req.method()} ${key} ${m[3] ? decodeURIComponent(m[3]) : ""} ${JSON.stringify(body)}`.replace("  ", " "));
+      if (control.failLabelWrites) return json(route, { message: "Resource not accessible by personal access token" }, 403, { "x-accepted-github-permissions": "issues=write" });
+      if (req.method() === "POST" && !m[3]) {
+        if (find(body.name)) return exists();
+        const created = { id: control.nextLabelId++, name: body.name, color: body.color, description: body.description || null, default: false };
+        list.push(created);
+        return json(route, created, 201);
+      }
+      if (req.method() === "PATCH" && m[3]) {
+        const current = find(decodeURIComponent(m[3]));
+        if (!current) return json(route, { message: "Not Found" }, 404);
+        const other = find(body.new_name ?? current.name);
+        if (other && other !== current) return exists();
+        Object.assign(current, { name: body.new_name ?? current.name, color: body.color ?? current.color, description: body.description || null });
+        return json(route, current);
+      }
+    }
     m = /^\/repos\/([^/]+)\/([^/]+)\/(actions\/workflows|actions\/runs|branches|environments)$/.exec(p);
     if (m) {
       const key = `${m[1]}/${m[2]}`;
@@ -299,6 +326,10 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     artifacts: structuredClone(fx.artifactsByRepo),
     issues: structuredClone(fx.issuesByOwner),
     projectItems: structuredClone(fx.projectItems),
+    labels: structuredClone(fx.labelsByRepo),
+    labelWrites: [],
+    nextLabelId: 7900,
+    failLabelWrites: false,
     patches: [],
     projectChanges: [],
     nextItemId: 9500,

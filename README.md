@@ -13,8 +13,13 @@
 - Releases を全リポジトリ横断で新しい順に一覧し（リポジトリごとに最大 100 件）、添付ファイルをその場でダウンロードできます（閲覧とダウンロードのみ）。プレリリースだけ・正式な Release だけにも絞り込めます
 - Actions のシークレットと変数を、リポジトリ単位と Environment 単位で全リポジトリ横断に一覧できます（閲覧専用。シークレットは値を読めないので名前と更新日だけ）。追加・変更・削除は GitHub で行います
 - シークレットと変数の比較表で、名前ごとに、どのリポジトリ・Environment に設定があるかを行列で見比べられます（Matrix。Secrets & Variables タブにマウスを合わせると List と Matrix を選べます）。Environment に無くてもリポジトリ単位にあるものは「リポジトリの分を使う」と表示し、どちらにも無いところを設定漏れとして色で示します。設定漏れのある名前だけにも絞り込めます。一覧と同じ取得結果を使うので、API の呼び出しは増えません。列になるのは、シークレットか変数が 1 つ以上あるリポジトリと Environment です（Organization のシークレットは含みません）
+- ラベルを全リポジトリ横断で並べて比べ、まとめてそろえられます（Labels）。行はラベル（大文字と小文字を区別しない名前）、列はリポジトリで、基準と名前・色・説明が違うところと、ラベルが無いところを色で示します
+  - 基準は、名前・色・説明のそれぞれでいちばん多い値です。マスを押すと、そのリポジトリの値を基準にできます
+  - ラベルを選び、足りないリポジトリへの追加と、名前（大文字と小文字）・色・説明の統一をまとめて行えます。どちらかだけにもできます
+  - 名前の変更もできます（付いている Issue と PR からは外れません）。変更後の名前がすでにあるリポジトリは、GitHub が受け付けないので飛ばします
+  - 変更は、予定を確認してから 1 件ずつ送り、送ったリポジトリだけを取り直します。削除はできません。アーカイブ済みのリポジトリは対象外です
 - 開いているタブの情報を自動で取り直します。上部の「自動更新」で切り替えられ、既定はオンです。オフでも再読み込みボタンはいつでも使えます
-  - Issue の List は 1 分ごと、Kanban は 2 分ごと、シークレットと変数は 1 日ごと
+  - Issue の List は 1 分ごと、Kanban は 2 分ごと、シークレットと変数・ラベルは 1 日ごと
   - Artifacts・Caches・Releases・Actions は、選んでいるリポジトリの数から間隔を決めます。1 時間あたりの呼び出しを API の上限（5,000 回）の 1 割に収めるように切り上げ、最短 5 分です（例: 100 リポジトリならアーティファクトは 12 分ごと、Actions は 24 分ごと）
   - Actions の実行中のワークフローは、これとは別に 1 分ごとに状態を取り直します
   - ページが見えていない間は止まり、戻ったときに間隔以上たっていればすぐに取り直します。削除の確認中と削除中は取り直しません
@@ -43,9 +48,9 @@ Chrome ウェブストアには未公開のため、GitHub Actions がビルド�
 | 方式 | 内容 |
 |---|---|
 | GitHub でログイン（OAuth Device Flow） | github.com でコードを入力して承認します。ビルド時に OAuth App の Client ID が必要です |
-| Personal Access Token | Classic（`repo`, `read:org`, `project`）または Fine-grained（Actions: Read and write、Contents: Read、Issues: Read、Members: Read、Environments: Read、Secrets: Read、Variables: Read、Organization の Projects: Read and write）。Fine-grained は所有者ごとに 1 つ追加します |
+| Personal Access Token | Classic（`repo`, `read:org`, `project`）または Fine-grained（Actions: Read and write、Contents: Read、Issues: Read and write、Members: Read、Environments: Read、Secrets: Read、Variables: Read、Organization の Projects: Read and write）。Fine-grained は所有者ごとに 1 つ追加します |
 
-Fine-grained の Contents: Read はワークフローの定義とブランチを読むため、Environments: Read は `environment` 型の入力を選択肢で出すために使います。Environments を読めない場合は自由入力になります。
+Fine-grained の Issues の Write はラベルの追加と変更に使います（読むだけなら Read で足ります）。Contents: Read はワークフローの定義とブランチを読むため、Environments: Read は `environment` 型の入力を選択肢で出すために使います。Environments を読めない場合は自由入力になります。
 
 カンバンには `project` スコープ（Fine-grained では Organization の Projects 権限）が必要です。このスコープを追加する前に GitHub でログインした場合は、一度ログアウトしてログインし直してください。個人アカウントのプロジェクトを Fine-grained PAT で扱えるかは確認できていません。
 
