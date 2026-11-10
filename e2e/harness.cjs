@@ -130,6 +130,19 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       const list = scope?.[m[4]] ?? [];
       return json(route, { total_count: list.length, [m[4]]: list });
     }
+    m = /^\/repos\/([^/]+)\/([^/]+)(?:\/(branches|rules\/branches)\/([^/]+))?$/.exec(p);
+    if (m && req.method() === "GET") {
+      const key = `${m[1]}/${m[2]}`;
+      if (key === "locked-corp/secret-service") return json(route, { message: "Resource not accessible by personal access token" }, 403);
+      const config = fx.repoSettingsByRepo[key];
+      if (!config) return json(route, { message: "Not Found" }, 404);
+      if (!m[3]) return json(route, { id: 1, name: m[2], full_name: key, ...config.settings });
+      if (decodeURIComponent(m[4]) !== config.settings.default_branch) return json(route, { message: "Branch not found" }, 404);
+      if (m[3] === "branches")
+        return json(route, { name: config.settings.default_branch, protected: config.protected, protection: { enabled: config.protected, required_status_checks: { enforcement_level: "off", contexts: [] } } });
+      if (config.rules === "upgrade") return json(route, { message: "Upgrade to GitHub Pro or make this repository public to enable this feature." }, 403);
+      return json(route, config.rules);
+    }
     m = /^\/repos\/([^/]+)\/([^/]+)\/labels(?:\/([^/]+))?$/.exec(p);
     if (m) {
       const key = `${m[1]}/${m[2]}`;

@@ -287,7 +287,33 @@ const labelsByRepo = {
   ],
 };
 
+// リポジトリの設定。基準はスカッシュだけを許可し、マージ後にブランチを消し、既定のブランチを PR 必須で保護する。
+// web-console はマージコミットを許可しブランチを消さず、mobile-app は Wiki がありブランチ保護を使えない（無料プラン）。
+// dotfiles はマージの設定が返らず（権限で読めない）、既定のブランチが main で保護していない
+const baseSettings = {
+  visibility: "private", default_branch: "master", has_issues: true, has_projects: true, has_wiki: false, has_discussions: false,
+  allow_merge_commit: false, allow_squash_merge: true, allow_rebase_merge: false, allow_auto_merge: true,
+  delete_branch_on_merge: true, allow_update_branch: true, web_commit_signoff_required: false,
+};
+const strictRules = [{ type: "pull_request", parameters: { required_approving_review_count: 1 } }, { type: "non_fast_forward" }, { type: "deletion" }];
+const repoSettingsByRepo = {
+  "acme-labs/data-pipeline": { settings: baseSettings, protected: true, rules: strictRules },
+  "acme-labs/web-console": {
+    settings: { ...baseSettings, allow_merge_commit: true, delete_branch_on_merge: false },
+    protected: true,
+    rules: [...strictRules, { type: "required_status_checks", parameters: { required_status_checks: [{ context: "ci" }] } }],
+  },
+  "acme-labs/mobile-app": { settings: { ...baseSettings, has_wiki: true }, protected: false, rules: "upgrade" },
+  "octo-dev/dotfiles": {
+    settings: Object.fromEntries(Object.entries({ ...baseSettings, default_branch: "main" }).filter(([k]) => !k.startsWith("allow_") && k !== "delete_branch_on_merge" && k !== "web_commit_signoff_required")),
+    protected: false,
+    rules: [],
+  },
+  "octo-dev/tile-game": { settings: baseSettings, protected: true, rules: strictRules },
+};
+
 module.exports = {
+  repoSettingsByRepo,
   labelsByRepo,
   archivedRunsByRepo,
   releasesByRepo,

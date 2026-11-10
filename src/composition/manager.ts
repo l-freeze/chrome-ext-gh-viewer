@@ -17,6 +17,8 @@ import { createBoardPreferencesStorage } from "../features/projects/gateways/sto
 import { createReleasesFeature } from "../features/releases/compose";
 import { createGitHubReleaseSource } from "../features/releases/gateways/github";
 import { createLabelsFeature } from "../features/labels/compose";
+import { createRepoSettingsFeature } from "../features/repo-settings/compose";
+import { createGitHubRepoSettingsSource } from "../features/repo-settings/gateways/github";
 import { createGitHubLabelSource } from "../features/labels/gateways/github";
 import { createSecretsFeature } from "../features/secrets/compose";
 import { createGitHubSecretSource } from "../features/secrets/gateways/github";
@@ -66,6 +68,7 @@ export function createManager(env: ManagerEnvironment) {
     releases: createReleasesFeature({ source: createGitHubReleaseSource((r) => access.forRepo(r)), downloader: env.downloads }),
     secrets: createSecretsFeature({ source: createGitHubSecretSource((r) => access.forRepo(r)) }),
     labels: createLabelsFeature({ source: createGitHubLabelSource((r) => access.forRepo(r)) }),
+    repoSettings: createRepoSettingsFeature({ source: createGitHubRepoSettingsSource((r) => access.forRepo(r)) }),
     preferences: createPreferencesFeature({ repository: createDisplayPreferencesStorage(env.storage) }),
     projects: createProjectsFeature({
       source: createGitHubProjectSource((login) => access.forOwner(login)),

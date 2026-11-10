@@ -18,6 +18,10 @@ async function shot(page, section, file, caption, { fullPage = false } = {}) {
 
 const url = (id, hash = "") => `chrome-extension://${id}/manager.html${hash}`;
 const rows = (page) => page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+const repoSettingsReady = async (page) => {
+  await page.mouse.move(200, 800);
+  await page.locator("table.table--repo-settings").getByRole("link", { name: "octo-dev/tile-game" }).waitFor();
+};
 const labelsReady = async (page) => {
   await page.mouse.move(200, 800);
   await page.locator("table.table--labels .label-pill", { hasText: "priority: high" }).waitFor();
@@ -255,6 +259,18 @@ async function connected(page, id, opts) {
     await context.close();
   }
 
+  // ---- Repository settings ----------------------------------------------------------
+  {
+    const { context, page, id } = await launch({ ext: extOAuth });
+    await connected(page, id);
+    await page.goto(url(id, "#repo-settings"));
+    await repoSettingsReady(page);
+    await shot(page, "Repository settings", "70-repo-settings.png", "違いのある設定だけ（色の付いたマスはいちばん多い値と違う。? は読めない、N/A はプランで使えない）");
+    await page.getByLabel("Only settings with differences").uncheck();
+    await shot(page, "Repository settings", "71-repo-settings-all.png", "すべての設定");
+    await context.close();
+  }
+
   // ---- ダーク ---------------------------------------------------------------------
   {
     const { context, page, id } = await launch({ ext: extOAuth, colorScheme: "dark" });
@@ -274,6 +290,9 @@ async function connected(page, id, opts) {
     await page.goto(url(id, "#secrets/matrix"));
     await matrix(page);
     await shot(page, "Dark", "39-dark-secrets-matrix.png", "ダーク: Secrets と Variables の比較表");
+    await page.goto(url(id, "#repo-settings"));
+    await repoSettingsReady(page);
+    await shot(page, "Dark", "37-dark-repo-settings.png", "ダーク: Repository settings");
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
@@ -316,6 +335,9 @@ async function connected(page, id, opts) {
     await page.locator(".tab-menu__list").getByRole("link", { name: "比較表" }).waitFor();
     await shot(page, "日本語", "47-ja-secrets-menu.png", "日本語: Secrets & Variables のメニュー");
     await page.mouse.move(200, 800);
+    await page.goto(url(id, "#repo-settings"));
+    await repoSettingsReady(page);
+    await shot(page, "日本語", "47a-ja-repo-settings.png", "日本語: Repository settings");
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     {
@@ -367,6 +389,10 @@ async function connected(page, id, opts) {
     await page.locator(".tab-menu__list").getByRole("link", { name: "Matrix" }).waitFor();
     await shot(page, "狭い画面（幅 420px）", "57-narrow-secrets-menu.png", "幅 420px: Secrets & Variables のメニュー");
     await page.mouse.move(200, 800);
+    await page.goto(url(id, "#repo-settings"));
+    await repoSettingsReady(page);
+    await shot(page, "狭い画面（幅 420px）", "57a-narrow-repo-settings.png", "幅 420px: Repository settings（表は枠の中で横にスクロールし、リポジトリの列は左に固定）");
+    console.log("narrow repo settings horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();

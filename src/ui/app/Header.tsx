@@ -6,7 +6,7 @@ import { useUi } from "./context";
 import type { WorkspaceState } from "./workspace";
 import "./header.css";
 
-export type Route = "artifacts" | "caches" | "actions" | "releases" | "issues" | "kanban" | "secrets" | "secretsMatrix" | "labels" | "settings";
+export type Route = "artifacts" | "caches" | "actions" | "releases" | "issues" | "kanban" | "secrets" | "secretsMatrix" | "labels" | "repoSettings" | "settings";
 
 /**
  * URL の # 以降と画面の対応。Issue タブは一覧（#issues・#issues/list）とカンバン（#issues/kanban）に、
@@ -22,6 +22,7 @@ export const ROUTE_HASH: Record<Route, string> = {
   secrets: "secrets",
   secretsMatrix: "secrets/matrix",
   labels: "labels",
+  repoSettings: "repo-settings",
   settings: "settings",
 };
 
@@ -41,6 +42,7 @@ export interface TabCounts {
   releases: Accessor<number>;
   issues: Accessor<number>;
   labels: Accessor<number>;
+  repoSettings: Accessor<number>;
   secrets: Accessor<number>;
 }
 
@@ -135,6 +137,7 @@ export function Header(props: {
           {issuesTab()}
           {tab("labels", t("tab.labels"), props.counts.labels)}
           {secretsTab()}
+          {tab("repoSettings", t("tab.repoSettings"), props.counts.repoSettings)}
         </nav>
         <div class="band__spacer" />
         <Show when={props.meter}>

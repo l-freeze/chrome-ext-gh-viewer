@@ -558,6 +558,40 @@ const step = async (name, fn) => {
     await page.getByRole("button", { name: "Close" }).click();
   });
 
+  await step("Repository settings: リポジトリごとの設定を並べ、いちばん多い値と違うところを示す（読むだけ）", async () => {
+    const before = log.length;
+    await page.getByRole("link", { name: /^Repository settings/ }).click();
+    const table = page.locator("table.table--repo-settings");
+    await table.getByRole("link", { name: "octo-dev/tile-game" }).waitFor();
+    await page.getByText("9 settings differ in 3 repositories").waitFor();
+    await page.getByText("1 repository could not be read").waitFor();
+    // 既定では違いのある設定だけ。行はいちばん多い値と、5 リポジトリ
+    assert.deepEqual(await table.locator("thead .repo-settings__setting").allInnerTexts(), [
+      "Default branch", "Wiki", "Merge commits", "Delete head branches", "Protected", "Require PR", "Status checks", "Block force pushes", "Restrict deletions",
+    ]);
+    assert.equal(await table.locator("tbody tr").count(), 6);
+    const row = (name) => table.locator("tbody tr").filter({ has: page.getByRole("link", { name }) });
+    const cells = (name) => row(name).locator("td").evaluateAll((tds) => tds.map((td) => (td.classList.contains("repo-settings__cell--differs") ? "*" : "") + td.textContent.trim()));
+    assert.deepEqual(await cells("acme-labs/web-console"), ["master", "Off", "*On", "*Off", "On", "1 approval", "*ci", "On", "On"]);
+    assert.deepEqual(await cells("acme-labs/mobile-app"), ["master", "*On", "Off", "On", "*Off", "N/A", "N/A", "N/A", "N/A"]);
+    // 権限で返らない設定は ? にして、違いとは数えない
+    assert.deepEqual(await cells("octo-dev/dotfiles"), ["*main", "Off", "?Unknown", "?Unknown", "*Off", "*Off", "Off", "*Off", "*Off"]);
+    assert.deepEqual(await table.locator(".repo-settings__majority td").evaluateAll((tds) => tds.map((td) => td.textContent.trim())), [
+      "master", "Off", "Off", "On", "On", "1 approval", "Off", "On", "On",
+    ]);
+    await page.screenshot({ path: path.join(OUT, "06m-repo-settings.png") });
+    await page.getByLabel("Only settings with differences").uncheck();
+    assert.equal(await table.locator("thead .repo-settings__setting").count(), 20);
+    await page.getByPlaceholder("Repository name").fill("acme");
+    assert.equal(await table.locator("tbody tr").count(), 4);
+    await page.getByPlaceholder("Repository name").fill("");
+    await page.getByLabel("Only settings with differences").check();
+    // 読むだけ。1 リポジトリあたり 3 回
+    const requests = log.slice(before).filter((l) => /^\w+ \/repos\/[^/]+\/[^/]+(\/branches\/|\/rules\/branches\/|$|\?)/.test(l));
+    assert.ok(requests.every((l) => l.startsWith("GET ")), requests.join("\n"));
+    assert.equal(requests.filter((l) => l.includes("/repos/acme-labs/data-pipeline")).length, 3);
+  });
+
   await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {
     await page.getByRole("link", { name: /^Actions/ }).click();
     await page.getByRole("link", { name: "Deploy", exact: true }).waitFor();

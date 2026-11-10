@@ -14,6 +14,8 @@ import { createCachesState } from "../screens/caches/state";
 import { IssuesScreen } from "../screens/issues/IssuesScreen";
 import { KanbanScreen } from "../screens/kanban/KanbanScreen";
 import { LabelsScreen } from "../screens/labels/LabelsScreen";
+import { RepoSettingsScreen } from "../screens/repo-settings/RepoSettingsScreen";
+import { createRepoSettingsState } from "../screens/repo-settings/state";
 import { createLabelsState } from "../screens/labels/state";
 import { createKanbanState } from "../screens/kanban/state";
 import { createIssuesState } from "../screens/issues/state";
@@ -41,6 +43,8 @@ const KANBAN_REFRESH_MS = 2 * 60_000;
 const SECRETS_REFRESH_MS = 24 * 60 * 60_000;
 /** ラベルもめったに変わらないので 1 日ごと。変更したリポジトリは変更の直後に取り直す */
 const LABELS_REFRESH_MS = 24 * 60 * 60_000;
+/** リポジトリの設定もめったに変わらないので 1 日ごと */
+const REPO_SETTINGS_REFRESH_MS = 24 * 60 * 60_000;
 
 const currentRoute = (): Route => routeOf(location.hash);
 
@@ -71,6 +75,7 @@ export function App(props: { deps: UiDeps }) {
   const secretsMatrix = createSecretsMatrixState(secrets);
   const releases = createReleasesState(deps, ws, () => route() === "releases");
   const labels = createLabelsState(deps, ws, () => route() === "labels");
+  const repoSettings = createRepoSettingsState(deps, ws, () => route() === "repoSettings");
   const connected = () => settings.active().length > 0;
 
   // 画面ごとの自動更新。リポジトリごとに呼ぶ画面は、選んでいるリポジトリの数から間隔を決める
@@ -86,6 +91,7 @@ export function App(props: { deps: UiDeps }) {
     { route: "secrets", intervalMs: () => SECRETS_REFRESH_MS, run: secrets.results.poll },
     { route: "secretsMatrix", intervalMs: () => SECRETS_REFRESH_MS, run: secrets.results.poll },
     { route: "labels", intervalMs: () => LABELS_REFRESH_MS, run: labels.results.poll },
+    { route: "repoSettings", intervalMs: () => REPO_SETTINGS_REFRESH_MS, run: repoSettings.results.poll },
   ];
   for (const plan of refreshPlans) {
     createPolling({ when: () => autoRefresh.enabled() && connected() && route() === plan.route, intervalMs: plan.intervalMs, run: plan.run });
@@ -109,6 +115,8 @@ export function App(props: { deps: UiDeps }) {
         return { progress: releases.results.progress(), refresh: releases.results.refresh };
       case "labels":
         return { progress: labels.results.progress(), refresh: labels.results.refresh };
+      case "repoSettings":
+        return { progress: repoSettings.results.progress(), refresh: repoSettings.results.refresh };
       case "secrets":
       case "secretsMatrix":
         return { progress: secrets.results.progress(), refresh: secrets.results.refresh };
@@ -129,6 +137,7 @@ export function App(props: { deps: UiDeps }) {
           actions: workflows.total,
           issues: () => issues.issues().length,
           labels: () => labels.table().rows.length,
+          repoSettings: repoSettings.differingRepos,
           releases: () => releases.releases().length,
           secrets: () => secrets.items().length,
         }}
@@ -181,6 +190,9 @@ export function App(props: { deps: UiDeps }) {
                 </Match>
                 <Match when={route() === "kanban"}>
                   <KanbanScreen state={kanban} />
+                </Match>
+                <Match when={route() === "repoSettings"}>
+                  <RepoSettingsScreen state={repoSettings} />
                 </Match>
                 <Match when={route() === "labels"}>
                   <LabelsScreen state={labels} />
