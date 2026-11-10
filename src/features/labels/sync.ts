@@ -51,6 +51,8 @@ export interface LabelPlan {
 export interface PlanInput {
   /** 対象にする行（key） */
   rows: readonly string[];
+  /** 対象にするリポジトリ（列の key）。ここに無いリポジトリには何も送らない */
+  repos: ReadonlySet<string>;
   edits: ReadonlyMap<string, RowEdit>;
   /** 足りないリポジトリに追加する */
   add: boolean;
@@ -98,6 +100,14 @@ export function buildTable(sources: ReadonlyArray<{ repo: RepoRef; labels: reado
   return { columns, rows };
 }
 
+/** 削除の対象: 選んだ行のラベルを、対象のリポジトリ（列の key）のうちそれがあるところから、行・列の順に集める */
+export function deletionTargets(table: LabelTable, rows: readonly string[], repos: ReadonlySet<string>): Label[] {
+  const keys = new Set(rows);
+  return table.rows
+    .filter((r) => keys.has(r.key))
+    .flatMap((r) => r.cells.filter((c, i): c is Label => c !== null && repos.has(table.columns[i]!.key)));
+}
+
 /** 別の名前へ変える（大文字と小文字だけの違いは名前の表記をそろえるだけなので含めない） */
 export function renameTarget(row: LabelRow, edit: RowEdit | undefined): string | null {
   const to = edit?.renameTo;
@@ -130,6 +140,7 @@ export function hasDifference(table: LabelTable, row: LabelRow, edit: RowEdit | 
  * - 別の名前へ変えるとき、変更後の名前の行があればその行の基準の値に、なければこの行の基準の色と説明にする。
  *   そのリポジトリに変更後の名前がすでにあるか、ほかの行が同じ名前へ先に変えるなら送らない（GitHub が受け付けないため）
  * - 別の名前への変更で生まれるラベルは、追加しない
+ * - 対象のリポジトリ（input.repos）に無いリポジトリには、何も送らない
  */
 export function buildPlan(table: LabelTable, input: PlanInput): LabelPlan {
   const rowByKey = new Map(table.rows.map((r) => [r.key, r]));
@@ -153,6 +164,7 @@ export function buildPlan(table: LabelTable, input: PlanInput): LabelPlan {
       ? referenceOf(table, targetRow, input.edits.get(targetKey))
       : { name: target, color: own.color, description: own.description };
     table.columns.forEach((column, i) => {
+      if (!input.repos.has(column.key)) return;
       const current = row.cells[i];
       if (!current) return;
       if (targetRow?.cells[i] || claimed.has(slot(column, targetKey))) {
@@ -169,6 +181,7 @@ export function buildPlan(table: LabelTable, input: PlanInput): LabelPlan {
     if (renameTarget(row, edit) !== null) continue;
     const reference = referenceOf(table, row, edit);
     table.columns.forEach((column, i) => {
+      if (!input.repos.has(column.key)) return;
       const current = row.cells[i];
       if (!current) {
         if (input.add && !claimed.has(slot(column, row.key))) creates.push({ kind: "create", repo: column.repo, next: reference });

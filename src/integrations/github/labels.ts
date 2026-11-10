@@ -53,3 +53,8 @@ export async function updateLabel(http: GitHubHttp, repo: RepoPath, currentName:
   });
   return decode(() => readLabel(data));
 }
+
+/** ラベルを削除する。付いている Issue と PR からも外れ、元に戻せない */
+export async function deleteLabel(http: GitHubHttp, repo: RepoPath, name: string, call: Call = {}): Promise<void> {
+  await http.request(`${labelsPath(repo)}/${encodeURIComponent(name)}`, { ...call, method: "DELETE" });
+}
