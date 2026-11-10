@@ -18,6 +18,10 @@ async function shot(page, section, file, caption, { fullPage = false } = {}) {
 
 const url = (id, hash = "") => `chrome-extension://${id}/manager.html${hash}`;
 const rows = (page) => page.locator("td.cell-name", { hasText: "parquet-sample-export" }).waitFor();
+const labelsReady = async (page) => {
+  await page.mouse.move(200, 800);
+  await page.locator("table.table--labels .label-pill", { hasText: "priority: high" }).waitFor();
+};
 // 前の操作でタブの上に残ったマウスがメニューを開かないよう、外へ動かしてから待つ
 const matrix = async (page) => {
   await page.mouse.move(200, 800);
@@ -207,6 +211,34 @@ async function connected(page, id, opts) {
     await context.close();
   }
 
+  // ---- Labels ---------------------------------------------------------------------
+  {
+    const { context, page, id } = await launch({ ext: extOAuth });
+    await connected(page, id);
+    await page.goto(url(id, "#labels"));
+    await labelsReady(page);
+    await shot(page, "Labels", "60-labels.png", "Labels: 違いのあるラベルだけ（基準と違うところは項目名、無いところは –）");
+    const rows = page.locator("table.table--labels tbody tr");
+    const bug = rows.filter({ has: page.locator(".label-pill", { hasText: /^bug$/i }) });
+    await bug.locator("td").nth(2).getByRole("button").click();
+    await shot(page, "Labels", "61-labels-reference.png", "web-console の値を基準にしたところ");
+    await bug.locator("td").nth(2).getByRole("button").click();
+    const typeBug = rows.filter({ has: page.locator(".label-pill", { hasText: "type: bug" }) });
+    await typeBug.getByRole("button", { name: "Rename" }).click();
+    await typeBug.getByLabel("New name").fill("bug");
+    await shot(page, "Labels", "62-labels-rename.png", "名前の変更の入力");
+    await typeBug.getByRole("button", { name: "OK" }).click();
+    await bug.getByRole("checkbox").check();
+    await typeBug.getByRole("checkbox").check();
+    await shot(page, "Labels", "63-labels-selected.png", "2 つを選んだところ（追加とそろえ込みを選べる）");
+    await page.getByRole("button", { name: /^Review/ }).click();
+    await shot(page, "Labels", "64-labels-confirm.png", "変更の予定の確認（すでに名前があるリポジトリは飛ばす）");
+    await page.getByRole("button", { name: /^Apply/ }).click();
+    await page.getByText(/^Applied/).waitFor();
+    await shot(page, "Labels", "65-labels-applied.png", "変更のあと（送ったリポジトリだけ取り直す）");
+    await context.close();
+  }
+
   // ---- ダーク ---------------------------------------------------------------------
   {
     const { context, page, id } = await launch({ ext: extOAuth, colorScheme: "dark" });
@@ -226,6 +258,10 @@ async function connected(page, id, opts) {
     await page.goto(url(id, "#secrets/matrix"));
     await matrix(page);
     await shot(page, "Dark", "39-dark-secrets-matrix.png", "ダーク: Secrets と Variables の比較表");
+    await page.goto(url(id, "#labels"));
+    await labelsReady(page);
+    await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
+    await shot(page, "Dark", "38-dark-labels.png", "ダーク: Labels（1 つ選択中）");
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "Dark", "33-dark-settings.png", "ダーク: 設定");
@@ -258,6 +294,16 @@ async function connected(page, id, opts) {
     await page.locator(".tab-menu__list").getByRole("link", { name: "比較表" }).waitFor();
     await shot(page, "日本語", "47-ja-secrets-menu.png", "日本語: Secrets & Variables のメニュー");
     await page.mouse.move(200, 800);
+    await page.goto(url(id, "#labels"));
+    await labelsReady(page);
+    {
+      const rows = page.locator("table.table--labels tbody tr");
+      await rows.filter({ has: page.locator(".label-pill", { hasText: /^bug$/ }) }).getByRole("checkbox").check();
+      await shot(page, "日本語", "48-ja-labels.png", "日本語: Labels（1 つ選択中）");
+      await page.getByRole("button", { name: /件の変更を確認/ }).click();
+      await shot(page, "日本語", "49-ja-labels-confirm.png", "日本語: Labels の変更の確認");
+      await page.getByRole("button", { name: "キャンセル" }).click();
+    }
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "日本語", "44-ja-settings.png", "日本語: 設定");
@@ -291,6 +337,15 @@ async function connected(page, id, opts) {
     await page.locator(".tab-menu__list").getByRole("link", { name: "Matrix" }).waitFor();
     await shot(page, "狭い画面（幅 420px）", "57-narrow-secrets-menu.png", "幅 420px: Secrets & Variables のメニュー");
     await page.mouse.move(200, 800);
+    await page.goto(url(id, "#labels"));
+    await labelsReady(page);
+    await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
+    await shot(page, "狭い画面（幅 420px）", "58-narrow-labels.png", "幅 420px: Labels（表は枠の中で横にスクロールし、ラベルの列は左に固定）");
+    console.log("narrow labels horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.getByRole("button", { name: /^Review/ }).click();
+    await shot(page, "狭い画面（幅 420px）", "59-narrow-labels-confirm.png", "幅 420px: Labels の変更の確認");
+    console.log("narrow labels confirm horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.getByRole("button", { name: "Cancel" }).click();
     await page.goto(url(id, "#settings"));
     await page.getByText("ghp_…1234").waitFor();
     await shot(page, "狭い画面（幅 420px）", "52-narrow-settings.png", "幅 420px: 設定");
