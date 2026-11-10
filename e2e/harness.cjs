@@ -156,6 +156,12 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
         Object.assign(current, { name: body.new_name ?? current.name, color: body.color ?? current.color, description: body.description || null });
         return json(route, current);
       }
+      if (req.method() === "DELETE" && m[3]) {
+        const current = find(decodeURIComponent(m[3]));
+        if (!current) return json(route, { message: "Not Found" }, 404);
+        list.splice(list.indexOf(current), 1);
+        return route.fulfill({ status: 204 });
+      }
     }
     m = /^\/repos\/([^/]+)\/([^/]+)\/(actions\/workflows|actions\/runs|branches|environments)$/.exec(p);
     if (m) {

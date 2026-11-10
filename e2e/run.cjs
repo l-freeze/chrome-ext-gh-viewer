@@ -402,6 +402,14 @@ const step = async (name, fn) => {
     const table = page.locator("table.table--labels");
     const bug = table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: /^bug$/i }) }).first();
     await bug.getByRole("checkbox").check();
+    // 対象のリポジトリは、最初はどれも入っていないので何も送らない
+    await page.getByText("Check the target repositories.").waitFor();
+    assert.equal(await page.getByRole("button", { name: "No changes" }).isDisabled(), true);
+    assert.equal(await page.getByRole("button", { name: "Delete", exact: true }).isDisabled(), true);
+    await page.getByLabel("Target octo-dev/dotfiles").check();
+    await page.getByRole("button", { name: "Review 1 change" }).waitFor();
+    await page.getByLabel("All repositories").check();
+    await page.getByText("Targets: 5 of 5 repositories").waitFor();
     await page.getByRole("button", { name: "Review 3 changes" }).waitFor();
     // 追加をやめると、追加の分が予定から外れる
     await page.getByLabel("Add missing labels").uncheck();
@@ -476,6 +484,76 @@ const step = async (name, fn) => {
     await page.getByText(/^4 of 4 changes failed\./).waitFor();
     await page.locator(".permission-hint li", { hasText: "Issues: Read and write" }).waitFor();
     await page.screenshot({ path: path.join(OUT, "06j-labels-failed.png") });
+    control.failLabelWrites = false;
+    await page.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("Labels: 削除は 2 段階の確認（元に戻せないこと → delete と入力）を経て、対象のリポジトリにあるものだけを消す", async () => {
+    const table = page.locator("table.table--labels");
+    const rowOf = (name) => table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: name }) });
+    // 対象は data-pipeline と tile-game だけ
+    await page.getByLabel("All repositories").uncheck();
+    await page.getByLabel("Target acme-labs/data-pipeline").check();
+    await page.getByLabel("Target octo-dev/tile-game").check();
+    for (const name of ["enhancement", "good first issue", "priority: high"]) await rowOf(name).getByRole("checkbox").check();
+    const writes = control.labelWrites.length;
+
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByText("Delete 4 labels from 2 repositories.").waitFor();
+    await page.getByText(/^Deleting a label removes it from every issue and pull request it is on\./).waitFor();
+    assert.deepEqual(await page.locator(".labels__plan li").evaluateAll((li) => li.map((l) => l.firstChild.textContent.trim())), [
+      "enhancement in acme-labs/data-pipeline",
+      "enhancement in octo-dev/tile-game",
+      "good first issue in octo-dev/tile-game",
+      "priority: high in acme-labs/data-pipeline",
+    ]);
+    const link = page.locator(".labels__plan li a").first();
+    assert.equal(await link.getAttribute("href"), `https://github.com/search?type=issues&q=${encodeURIComponent('repo:acme-labs/data-pipeline label:"enhancement"')}`);
+    await page.screenshot({ path: path.join(OUT, "06k-labels-delete-warn.png") });
+    // 1 段目で取りやめると何も消さず、選択は残る
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByText("3 labels selected").waitFor();
+    assert.equal(control.labelWrites.length, writes);
+
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("button", { name: "I understand" }).click();
+    await page.getByText("Are you sure?").waitFor();
+    await page.getByText("This cannot be undone. Type delete to continue.").waitFor();
+    const confirm = page.getByRole("button", { name: "Delete 4 labels" });
+    assert.equal(await confirm.isDisabled(), true);
+    await page.getByLabel("Type delete to continue.").fill("Delete");
+    assert.equal(await confirm.isDisabled(), true);
+    await page.getByLabel("Type delete to continue.").press("Enter");
+    assert.equal(control.labelWrites.length, writes);
+    await page.getByLabel("Type delete to continue.").fill("delete");
+    await page.screenshot({ path: path.join(OUT, "06l-labels-delete-confirm.png") });
+    await confirm.click();
+    await page.getByText("Deleted 4 labels.").waitFor();
+    assert.deepEqual(control.labelWrites.slice(writes), [
+      "DELETE acme-labs/data-pipeline enhancement {}",
+      "DELETE octo-dev/tile-game enhancement {}",
+      "DELETE octo-dev/tile-game good first issue {}",
+      "DELETE acme-labs/data-pipeline priority: high {}",
+    ]);
+    // 対象でなかったリポジトリの enhancement は残る
+    assert.deepEqual(control.labels["acme-labs/web-console"].map((l) => l.name).sort(), ["bug", "enhancement", "kind: bug"]);
+    await rowOf("good first issue").waitFor({ state: "detached" });
+    await page.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("Labels: 削除できなかったものは、残っているラベルと必要な権限を示す", async () => {
+    const table = page.locator("table.table--labels");
+    control.failLabelWrites = true;
+    await page.getByLabel("All repositories").check();
+    await table.locator("tbody tr").filter({ has: page.locator(".label-pill", { hasText: "kind: bug" }) }).getByRole("checkbox").check();
+    await page.getByRole("button", { name: "Delete", exact: true }).click();
+    await page.getByRole("button", { name: "I understand" }).click();
+    await page.getByLabel("Type delete to continue.").fill("delete");
+    await page.getByRole("button", { name: "Delete 1 label" }).click();
+    await page.getByText(/^1 of 1 labels could not be deleted\./).waitFor();
+    await page.getByText("These labels are still there:").waitFor();
+    await page.locator(".labels__plan li", { hasText: "kind: bug in acme-labs/web-console" }).waitFor();
+    await page.locator(".permission-hint li", { hasText: "Issues: Read and write" }).waitFor();
     control.failLabelWrites = false;
     await page.getByRole("button", { name: "Close" }).click();
   });
