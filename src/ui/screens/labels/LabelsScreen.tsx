@@ -1,4 +1,4 @@
-import { createSignal, For, Match, Show, Switch } from "solid-js";
+import { createEffect, createSignal, For, Match, Show, Switch } from "solid-js";
 import { changedFields, labelKey, readLabelName, type LabelField, type LabelValue } from "../../../features/labels/label";
 import { cellStatus, renameTarget, type LabelChange, type LabelRow } from "../../../features/labels/sync";
 import { repoKey } from "../../../features/workspace/repository";
@@ -173,10 +173,98 @@ export function LabelsScreen(props: { state: LabelsState }) {
     );
   }
 
+  const searchUrl = (repo: string, name: string) =>
+    `https://github.com/search?type=issues&q=${encodeURIComponent(`repo:${repo} label:"${name}"`)}`;
+
   function ActionBar() {
     const label = () => t("labels.selection", { count: s.selectedCount() });
+    const deleteCount = () => s.toDelete().length;
+    const deleteRepos = () => new Set(s.toDelete().map((l) => repoKey(l.repo))).size;
     return (
       <Switch>
+        <Match when={s.phase().phase === "deleteWarn"}>
+          <BulkBar
+            tone="danger"
+            label={label()}
+            text={
+              <>
+                <Icon name="warning" />
+                {t("labels.deleteWarn.title", { count: deleteCount(), repos: t("labels.repoCount", { count: deleteRepos() }) })}
+              </>
+            }
+            actions={
+              <>
+                <button type="button" class="button" onClick={() => s.cancel()}>
+                  {t("action.cancel")}
+                </button>
+                <button type="button" class="button button--danger" onClick={() => s.acknowledgeDelete()}>
+                  {t("labels.deleteWarn.ok")}
+                </button>
+              </>
+            }
+            detail={
+              <div class="labels__delete">
+                <p class="labels__delete-body">{t("labels.deleteWarn.body")}</p>
+                <ul class="labels__plan">
+                  <For each={s.toDelete()}>
+                    {(l) => (
+                      <li>
+                        {t("labels.deleteItem", { name: l.name, repo: repoKey(l.repo) })}{" "}
+                        <a class="small" href={searchUrl(repoKey(l.repo), l.name)} target="_blank" rel="noreferrer">
+                          {t("labels.deleteLink")}
+                        </a>
+                      </li>
+                    )}
+                  </For>
+                </ul>
+              </div>
+            }
+          />
+        </Match>
+        <Match when={s.phase().phase === "deleteConfirm"}>
+          <BulkBar
+            tone="danger"
+            label={label()}
+            text={
+              <>
+                <Icon name="warning" />
+                {t("labels.deleteConfirm.title")}
+              </>
+            }
+            detail={
+              <form
+                class="labels__delete"
+                onSubmit={(e) => {
+                  e.preventDefault();
+                  if (s.canDelete()) void s.remove();
+                }}
+              >
+                <p class="labels__delete-body">
+                  {t("labels.deleteConfirm.body")} {t("labels.deleteConfirm.type")}
+                </p>
+                <div class="labels__delete-confirm">
+                  <input
+                    type="text"
+                    class="mono"
+                    aria-label={t("labels.deleteConfirm.type")}
+                    autocomplete="off"
+                    spellcheck={false}
+                    value={s.deleteWord()}
+                    onInput={(e) => s.setDeleteWord(e.currentTarget.value)}
+                    ref={(el) => queueMicrotask(() => el.focus())}
+                  />
+                  <button type="submit" class="button button--danger-solid" disabled={!s.canDelete()}>
+                    <Icon name="trash" />
+                    {t("labels.deleteConfirm.button", { count: deleteCount() })}
+                  </button>
+                  <button type="button" class="button" onClick={() => s.cancel()}>
+                    {t("action.cancel")}
+                  </button>
+                </div>
+              </form>
+            }
+          />
+        </Match>
         <Match when={s.phase().phase === "confirm"}>
           <BulkBar
             tone="danger"
@@ -210,6 +298,9 @@ export function LabelsScreen(props: { state: LabelsState }) {
         <Match when={s.phase().phase === "applying" && s.phase()} keyed>
           {(ph) => ph.phase === "applying" && <BulkBar tone="info" label={label()} text={t("labels.applying", { done: ph.done, total: ph.total })} />}
         </Match>
+        <Match when={s.phase().phase === "deleting" && s.phase()} keyed>
+          {(ph) => ph.phase === "deleting" && <BulkBar tone="danger" label={label()} text={t("labels.deleting", { done: ph.done, total: ph.total })} />}
+        </Match>
         <Match when={s.selectedCount() > 0}>
           <BulkBar
             tone="info"
@@ -225,12 +316,19 @@ export function LabelsScreen(props: { state: LabelsState }) {
                   <input type="checkbox" checked={s.update()} onChange={(e) => s.setUpdate(e.currentTarget.checked)} />
                   {t("labels.update")}
                 </label>
+                <Show when={s.targetCount() === 0}>
+                  <span class="labels__no-targets">{t("labels.noTargets")}</span>
+                </Show>
               </>
             }
             actions={
               <>
                 <button type="button" class="button button--primary" disabled={s.plan().changes.length === 0} onClick={() => s.review()}>
                   {s.plan().changes.length === 0 ? t("labels.noChanges") : t("labels.review", { count: s.plan().changes.length })}
+                </button>
+                <button type="button" class="button button--danger" disabled={s.deletable().length === 0} onClick={() => s.askDelete()}>
+                  <Icon name="trash" />
+                  {t("labels.delete")}
                 </button>
                 <button type="button" class="button button--ghost" onClick={() => s.clearSelection()}>
                   {t("action.clear")}
@@ -242,19 +340,35 @@ export function LabelsScreen(props: { state: LabelsState }) {
         <Match when={s.notice()} keyed>
           {(n) => (
             <BulkBar
-              tone={n.kind === "failed" ? "warn" : "info"}
+              tone={n.kind === "failed" || n.kind === "deleteFailed" ? "warn" : "info"}
               label={t("tab.labels")}
               text={
                 n.kind === "applied"
                   ? t("labels.applied", { count: n.count })
-                  : `${t("labels.applyFailed", { count: n.count, total: n.total })} ${errorText(t, n.errors[0])}`
+                  : n.kind === "deleted"
+                    ? t("labels.deleted", { count: n.count })
+                    : n.kind === "failed"
+                      ? `${t("labels.applyFailed", { count: n.count, total: n.total })} ${errorText(t, n.errors[0])}`
+                      : `${t("labels.deleteFailed", { count: n.count, total: n.total })} ${errorText(t, n.errors[0])}`
               }
               actions={
                 <button type="button" class="button button--ghost" onClick={() => s.dismissNotice()}>
                   {t("action.close")}
                 </button>
               }
-              detail={n.kind === "failed" ? <PermissionHint error={n.errors[0]} operation="labels.write" /> : undefined}
+              detail={
+                n.kind === "failed" ? (
+                  <PermissionHint error={n.errors[0]} operation="labels.write" />
+                ) : n.kind === "deleteFailed" ? (
+                  <div class="labels__delete">
+                    <p class="labels__delete-body">{t("labels.remaining")}</p>
+                    <ul class="labels__plan">
+                      <For each={n.remaining}>{(l) => <li>{t("labels.deleteItem", { name: l.name, repo: repoKey(l.repo) })}</li>}</For>
+                    </ul>
+                    <PermissionHint error={n.errors[0]} operation="labels.write" />
+                  </div>
+                ) : undefined
+              }
             />
           )}
         </Match>
@@ -298,6 +412,20 @@ export function LabelsScreen(props: { state: LabelsState }) {
         operation="labels.list"
       />
 
+      <div class="labels__targets">
+        <label class="labels__option">
+          <input
+            type="checkbox"
+            checked={s.table().columns.length > 0 && s.targetCount() === s.table().columns.length}
+            disabled={busy() || s.table().columns.length === 0}
+            ref={(el) => createEffect(() => (el.indeterminate = s.targetCount() > 0 && s.targetCount() < s.table().columns.length))}
+            onChange={(e) => s.setAllTargets(e.currentTarget.checked)}
+          />
+          {t("labels.targets.all")}
+        </label>
+        <span class="muted small">{t("labels.targets.count", { count: s.targetCount(), total: s.table().columns.length })}</span>
+      </div>
+
       <ActionBar />
 
       <datalist id="labels-names">
@@ -317,11 +445,20 @@ export function LabelsScreen(props: { state: LabelsState }) {
                 </th>
                 <For each={s.table().columns}>
                   {(column) => (
-                    <th scope="col" class="labels__repo">
-                      <a href={`https://github.com/${column.key}/labels`} target="_blank" rel="noreferrer">
-                        <span class="muted">{column.repo.owner}/</span>
-                        {column.repo.name}
-                      </a>
+                    <th scope="col" class="labels__repo" classList={{ "labels__repo--off": !s.isTarget(column.key) }}>
+                      <div class="labels__repo-line">
+                        <input
+                          type="checkbox"
+                          aria-label={t("labels.targets.repo", { repo: column.key })}
+                          checked={s.isTarget(column.key)}
+                          disabled={busy()}
+                          onChange={() => s.toggleTarget(column.key)}
+                        />
+                        <a href={`https://github.com/${column.key}/labels`} target="_blank" rel="noreferrer">
+                          <span class="muted">{column.repo.owner}/</span>
+                          {column.repo.name}
+                        </a>
+                      </div>
                     </th>
                   )}
                 </For>

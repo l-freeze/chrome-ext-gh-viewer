@@ -214,3 +214,51 @@
   font-weight: 600;
   line-height: 1.2;
 }
+
+/* 対象のリポジトリ（チェックを入れたものだけに送る） */
+.labels__targets {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 12px;
+  margin: 0 0 12px;
+}
+.labels__repo-line {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.table--labels .labels__repo--off a {
+  color: var(--text-3);
+  font-weight: 400;
+}
+.labels__no-targets {
+  color: var(--warn);
+  font-weight: 500;
+}
+
+/* 削除の確認（2 段階） */
+.labels__delete {
+  color: var(--text);
+  font-weight: 400;
+}
+.labels__delete-body {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.labels__delete-confirm {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+}
+.labels__delete-confirm input {
+  width: 140px;
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--danger);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
