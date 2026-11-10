@@ -564,6 +564,8 @@ const step = async (name, fn) => {
     const table = page.locator("table.table--repo-settings");
     await table.getByRole("link", { name: "octo-dev/tile-game" }).waitFor();
     await page.getByText("9 settings differ in 3 repositories").waitFor();
+    // 取り直す間隔は、日・時間・分で示す（1440 分ではなく 1 日）
+    assert.equal(await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("title"), "Refresh every 1 day while this screen is open");
     await page.getByText("1 repository could not be read").waitFor();
     // 既定では違いのある設定だけ。行はいちばん多い値と、5 リポジトリ
     assert.deepEqual(await table.locator("thead .repo-settings__setting").allInnerTexts(), [
@@ -580,6 +582,27 @@ const step = async (name, fn) => {
       "master", "Off", "Off", "On", "On", "1 approval", "Off", "On", "On",
     ]);
     await page.screenshot({ path: path.join(OUT, "06m-repo-settings.png") });
+
+    // 並べ替え: 既定はリポジトリ名の昇順。押した順に優先し、昇順 → 降順 → 解除。リセットで既定に戻る
+    const order = () => table.locator("tbody tr:not(.repo-settings__majority) th a").allInnerTexts();
+    const sortBy = (name) => table.locator("thead").getByRole("button", { name: new RegExp(`^${name}`) }).click();
+    assert.deepEqual(await order(), ["acme-labs/data-pipeline", "acme-labs/mobile-app", "acme-labs/web-console", "octo-dev/dotfiles", "octo-dev/tile-game"]);
+    await sortBy("Repository");
+    await sortBy("Repository");
+    assert.deepEqual(await order(), ["octo-dev/tile-game", "octo-dev/dotfiles", "acme-labs/web-console", "acme-labs/mobile-app", "acme-labs/data-pipeline"]);
+    await sortBy("Repository");
+    await sortBy("Protected");
+    await sortBy("Wiki");
+    await sortBy("Wiki");
+    // 保護: オフ（mobile-app・dotfiles）が先。その中は Wiki の降順（オンの mobile-app が先）
+    assert.deepEqual(await order(), ["acme-labs/mobile-app", "octo-dev/dotfiles", "acme-labs/data-pipeline", "acme-labs/web-console", "octo-dev/tile-game"]);
+    await page.getByText("Sorted by Protected ↑, Wiki ↓, then repository name.").waitFor();
+    assert.equal(await table.locator("thead th[aria-sort='descending']").innerText(), "Wiki↓2");
+    await page.getByRole("button", { name: "Reset sort" }).click();
+    await page.getByText("Sorted by repository name.").waitFor();
+    assert.equal(await page.getByRole("button", { name: "Reset sort" }).isDisabled(), true);
+    assert.equal((await order())[0], "acme-labs/data-pipeline");
+
     await page.getByLabel("Only settings with differences").uncheck();
     assert.equal(await table.locator("thead .repo-settings__setting").count(), 20);
     await page.getByPlaceholder("Repository name").fill("acme");

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { compareSettings, differsFromMajority, rowDiffers } from "../../src/features/repo-settings/comparison";
+import { compareSettings, cycleSort, differsFromMajority, rowDiffers, sortRows, type SettingsSort } from "../../src/features/repo-settings/comparison";
 import { createRepoSettingsFeature } from "../../src/features/repo-settings/compose";
 import { createGitHubRepoSettingsSource } from "../../src/features/repo-settings/gateways/github";
 import { known, SETTINGS, UNKNOWN, type RepoSettings, type SettingKey, type SettingValue } from "../../src/features/repo-settings/settings";
@@ -106,5 +106,47 @@ describe("GitHub から読む", () => {
     const f = createRepoSettingsFeature({ source: createGitHubRepoSettingsSource(() => http) });
     const [res] = await f.list([repo("locked")]);
     expect(res!.ok).toBe(false);
+  });
+});
+
+describe("並べ替え", () => {
+  const list = [
+    settings("web", { visibility: known("public"), squashMerge: known(true), requirePullRequest: known(2) }),
+    settings("api", { visibility: known("private"), squashMerge: known(false), requirePullRequest: known(false) }),
+    settings("cli", { visibility: known("private"), squashMerge: UNKNOWN, requirePullRequest: known(1) }),
+    settings("Old", { visibility: known("public"), squashMerge: known(true), requirePullRequest: { kind: "unavailable" } }),
+  ];
+  const names = (sort: SettingsSort) => sortRows(list, sort).map((r) => r.repo.name);
+
+  it("条件が無ければリポジトリ名の昇順。リポジトリ名は大文字と小文字を区別せず、降順にもできる", () => {
+    expect(names([])).toEqual(["api", "cli", "Old", "web"]);
+    expect(names([{ key: "repo", dir: "desc" }])).toEqual(["web", "Old", "cli", "api"]);
+  });
+
+  it("設定の値で並べ、差が無ければリポジトリ名の昇順。読めなかったものは向きにかかわらず末尾", () => {
+    expect(names([{ key: "visibility", dir: "asc" }])).toEqual(["api", "cli", "Old", "web"]);
+    expect(names([{ key: "visibility", dir: "desc" }])).toEqual(["Old", "web", "api", "cli"]);
+    // オフはオンより前
+    expect(names([{ key: "squashMerge", dir: "asc" }])).toEqual(["api", "Old", "web", "cli"]);
+    expect(names([{ key: "squashMerge", dir: "desc" }])).toEqual(["Old", "web", "api", "cli"]);
+    // PR 必須は「不要」が先、承認の数の順。使えないものは末尾
+    expect(names([{ key: "requirePullRequest", dir: "asc" }])).toEqual(["api", "cli", "web", "Old"]);
+    expect(names([{ key: "requirePullRequest", dir: "desc" }])).toEqual(["web", "cli", "api", "Old"]);
+  });
+
+  it("複数の条件は並べた順に優先する（ORDER BY a, b と同じ）", () => {
+    expect(names([{ key: "visibility", dir: "desc" }, { key: "repo", dir: "desc" }])).toEqual(["web", "Old", "cli", "api"]);
+    expect(names([{ key: "visibility", dir: "asc" }, { key: "requirePullRequest", dir: "desc" }])).toEqual(["cli", "api", "web", "Old"]);
+  });
+
+  it("見出しを押すたびに、末尾に昇順で足す → 降順 → 外す。ほかの条件の順番は変えない", () => {
+    let sort: SettingsSort = [];
+    sort = cycleSort(sort, "visibility");
+    sort = cycleSort(sort, "repo");
+    expect(sort).toEqual([{ key: "visibility", dir: "asc" }, { key: "repo", dir: "asc" }]);
+    sort = cycleSort(sort, "visibility");
+    expect(sort).toEqual([{ key: "visibility", dir: "desc" }, { key: "repo", dir: "asc" }]);
+    sort = cycleSort(sort, "visibility");
+    expect(sort).toEqual([{ key: "repo", dir: "asc" }]);
   });
 });
