@@ -17,6 +17,7 @@ src/
 │   ├── secrets/              Actions のシークレットと変数の一覧と比較表（閲覧のみ。Secrets & Variables タブの List と Matrix）
 │   ├── issues/               Issue の横断検索（Issue タブの List）
 │   ├── labels/               ラベルのリポジトリ横断の比較と、追加・名前・色・説明の統一・削除（Labels タブ）
+│   ├── repo-settings/        リポジトリの設定と既定のブランチの保護の比較（閲覧のみ。Repository settings タブ）
 │   ├── preferences/          画面をまたぐ表示の好み（自動更新のオン・オフ）
 │   └── projects/             Projects のカンバンと、項目の Status の変更（Issue タブの Kanban）
 ├── integrations/github/      GitHub という外部サービスの約束ごと
@@ -106,6 +107,9 @@ ui/
 Issue の機能（`features/issues`）とは独立しています。変更は確認の段階を経てから、GitHub の書き込みの制限に触れないよう 1 件ずつ送ります。
 送るのは、画面でチェックを入れたリポジトリだけです（予定と削除の対象を作る関数が、対象のリポジトリを引数で受け取る）。
 削除は元に戻せないため、画面の状態（`screens/labels/state.ts`）が 2 段階の確認（元に戻せないことの確認 → `delete` の入力）を経たときだけ `remove` を呼び、1 段目で決めた対象をそのまま削除します。
+
+例: Repository settings タブは、リポジトリの設定・ブランチ・ブランチのルールという新しい API の分野を扱うため、`features/repo-settings` と `screens/repo-settings` を足しています。
+権限やプランで読めない保護は、リポジトリ全体の失敗にせず「読めない」「使えない」という値にします（gateway が決める）。
 
 例: Secrets & Variables タブの Matrix（比較表）は、一覧と同じ取得結果を並べ直すだけなので、新しい機能は足していません。
 行列を組み立てる規則を `features/secrets/matrix.ts` に、画面を `screens/secrets/MatrixScreen.tsx` と `matrix-state.ts` に置いています。
