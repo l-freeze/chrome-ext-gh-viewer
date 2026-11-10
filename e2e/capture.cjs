@@ -266,6 +266,16 @@ async function connected(page, id, opts) {
     await page.goto(url(id, "#repo-settings"));
     await repoSettingsReady(page);
     await shot(page, "Repository settings", "70-repo-settings.png", "違いのある設定だけ（色の付いたマスはいちばん多い値と違う。? は読めない、N/A はプランで使えない）");
+    const sortBy = (name) => page.locator("table.table--repo-settings thead").getByRole("button", { name: new RegExp(`^${name}`) }).click();
+    await sortBy("Protected");
+    await sortBy("Wiki");
+    await sortBy("Wiki");
+    await shot(page, "Repository settings", "70a-repo-settings-sorted.png", "保護の昇順、Wiki の降順で並べ替え（押した順に優先）");
+    await page.getByRole("button", { name: "Reset sort" }).click();
+    await page.getByRole("switch", { name: "Auto refresh" }).hover();
+    await page.waitForTimeout(1200);
+    console.log("auto refresh title:", await page.getByRole("switch", { name: "Auto refresh" }).getAttribute("title"));
+    await page.mouse.move(200, 800);
     await page.getByLabel("Only settings with differences").uncheck();
     await shot(page, "Repository settings", "71-repo-settings-all.png", "すべての設定");
     await context.close();
@@ -337,7 +347,10 @@ async function connected(page, id, opts) {
     await page.mouse.move(200, 800);
     await page.goto(url(id, "#repo-settings"));
     await repoSettingsReady(page);
-    await shot(page, "日本語", "47a-ja-repo-settings.png", "日本語: Repository settings");
+    await page.locator("table.table--repo-settings thead").getByRole("button", { name: /^保護/ }).click();
+    await page.locator("table.table--repo-settings thead").getByRole("button", { name: /^Wiki/ }).click();
+    await shot(page, "日本語", "47a-ja-repo-settings.png", "日本語: Repository settings（保護、Wiki の順に並べ替え）");
+    console.log("ja auto refresh title:", await page.getByRole("switch", { name: "自動更新" }).getAttribute("title"));
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     {
