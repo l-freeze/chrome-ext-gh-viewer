@@ -20,7 +20,8 @@ export type GitHubOperation =
   | "projects.list"
   | "projects.move"
   | "labels.list"
-  | "labels.write";
+  | "labels.write"
+  | "repoSettings.read";
 
 interface Requirement {
   /** Fine-grained PAT の権限（"名前=read|write"）。すべて必要 */
@@ -50,6 +51,7 @@ const REQUIREMENTS: Record<GitHubOperation, Requirement> = {
   "projects.move": { fineGrained: ["organization_projects=write"], classic: ["project"] },
   "labels.list": { fineGrained: ["issues=read"], classic: ["repo"] },
   "labels.write": { fineGrained: ["issues=write"], classic: ["repo"] },
+  "repoSettings.read": { fineGrained: ["metadata=read"], classic: ["repo"] },
 };
 
 export interface PermissionHint {
