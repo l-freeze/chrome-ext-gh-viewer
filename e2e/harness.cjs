@@ -131,10 +131,21 @@ function api(log, { delayMs = 0, dispatches = [], deletes = [], control } = {}) 
       return json(route, { total_count: list.length, [m[4]]: list });
     }
     m = /^\/repos\/([^/]+)\/([^/]+)(?:\/(branches|rules\/branches)\/([^/]+))?$/.exec(p);
+    if (m && !m[3] && req.method() === "PATCH") {
+      const key = `${m[1]}/${m[2]}`;
+      const body = JSON.parse(req.postData() ?? "{}");
+      control.repoWrites.push(`PATCH ${key} ${JSON.stringify(body)}`);
+      if (control.failRepoWrites)
+        return json(route, { message: "Must have admin rights to Repository." }, 403, { "x-accepted-github-permissions": "administration=write" });
+      const config = control.repoSettings[key];
+      if (!config) return json(route, { message: "Not Found" }, 404);
+      Object.assign(config.settings, body);
+      return json(route, { id: 1, name: m[2], full_name: key, ...config.settings });
+    }
     if (m && req.method() === "GET") {
       const key = `${m[1]}/${m[2]}`;
       if (key === "locked-corp/secret-service") return json(route, { message: "Resource not accessible by personal access token" }, 403);
-      const config = fx.repoSettingsByRepo[key];
+      const config = control.repoSettings[key];
       if (!config) return json(route, { message: "Not Found" }, 404);
       if (!m[3]) return json(route, { id: 1, name: m[2], full_name: key, ...config.settings });
       if (decodeURIComponent(m[4]) !== config.settings.default_branch) return json(route, { message: "Branch not found" }, 404);
@@ -346,6 +357,9 @@ async function launch({ colorScheme = "light", locale = "en-US", viewport = { wi
     issues: structuredClone(fx.issuesByOwner),
     projectItems: structuredClone(fx.projectItems),
     labels: structuredClone(fx.labelsByRepo),
+    repoSettings: structuredClone(fx.repoSettingsByRepo),
+    repoWrites: [],
+    failRepoWrites: false,
     labelWrites: [],
     nextLabelId: 7900,
     failLabelWrites: false,
