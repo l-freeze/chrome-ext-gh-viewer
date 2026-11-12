@@ -17,7 +17,7 @@ src/
 │   ├── secrets/              Actions のシークレットと変数の一覧と比較表（閲覧のみ。Secrets & Variables タブの List と Matrix）
 │   ├── issues/               Issue の横断検索（Issue タブの List）
 │   ├── labels/               ラベルのリポジトリ横断の比較と、追加・名前・色・説明の統一・削除（Labels タブ）
-│   ├── repo-settings/        リポジトリの設定と既定のブランチの保護の比較（閲覧のみ。Repository settings タブ）
+│   ├── repo-settings/        リポジトリの設定と既定のブランチの保護の比較、公開範囲と既定のブランチの変更（Repository settings タブ）
 │   ├── preferences/          画面をまたぐ表示の好み（自動更新のオン・オフ）
 │   └── projects/             Projects のカンバンと、項目の Status の変更（Issue タブの Kanban）
 ├── integrations/github/      GitHub という外部サービスの約束ごと
@@ -110,6 +110,8 @@ Issue の機能（`features/issues`）とは独立しています。変更は確
 
 例: Repository settings タブは、リポジトリの設定・ブランチ・ブランチのルールという新しい API の分野を扱うため、`features/repo-settings` と `screens/repo-settings` を足しています。
 権限やプランで読めない保護は、リポジトリ全体の失敗にせず「読めない」「使えない」という値にします（gateway が決める）。
+公開範囲と既定のブランチの変更は、use-case（`use-cases/change.ts`）が値を確かめ（既定のブランチは既存のものだけ）、変えたあとの設定を読み直して返します。
+確認の段階（公開範囲は 2 段階、既定のブランチは 1 回）は画面の状態（`screens/repo-settings/state.ts`）が持ち、その間は取り直しません。
 
 例: Secrets & Variables タブの Matrix（比較表）は、一覧と同じ取得結果を並べ直すだけなので、新しい機能は足していません。
 行列を組み立てる規則を `features/secrets/matrix.ts` に、画面を `screens/secrets/MatrixScreen.tsx` と `matrix-state.ts` に置いています。
