@@ -278,6 +278,28 @@ async function connected(page, id, opts) {
     await page.mouse.move(200, 800);
     await page.getByLabel("Only settings with differences").uncheck();
     await shot(page, "Repository settings", "71-repo-settings-all.png", "すべての設定");
+    await page.getByRole("button", { name: "Change acme-labs/data-pipeline" }).click();
+    await page.getByLabel("Default branch", { exact: true }).waitFor();
+    await shot(page, "Repository settings", "72-repo-settings-edit.png", "行の「変更」で開く欄（公開範囲と既定のブランチ）");
+    await page.getByRole("button", { name: "Make public…" }).click();
+    await shot(page, "Repository settings", "73-repo-visibility-warn.png", "公開にする 1 段目（影響）");
+    await page.getByRole("button", { name: "I understand" }).click();
+    await page.getByLabel("Type acme-labs/data-pipeline to continue.").fill("acme-labs/data-pipeline");
+    await shot(page, "Repository settings", "74-repo-visibility-confirm.png", "公開にする 2 段目（リポジトリ名を入力するまで押せない）");
+    await page.getByRole("button", { name: "Make acme-labs/data-pipeline public" }).click();
+    await page.getByText("Made acme-labs/data-pipeline public.").waitFor();
+    await shot(page, "Repository settings", "74a-repo-visibility-done.png", "公開にしたあと（そのリポジトリだけ取り直す）");
+    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByRole("button", { name: "Change acme-labs/data-pipeline" }).click();
+    await page.getByLabel("Default branch", { exact: true }).waitFor();
+    await page.getByRole("button", { name: "Make private…" }).click();
+    await shot(page, "Repository settings", "75-repo-visibility-warn-private.png", "非公開にする 1 段目（影響）");
+    await page.getByRole("button", { name: "Cancel" }).click();
+    await page.getByRole("button", { name: "Change octo-dev/tile-game" }).click();
+    await page.getByLabel("Default branch", { exact: true }).selectOption("legacy");
+    await page.getByRole("button", { name: "Change default branch…" }).click();
+    await shot(page, "Repository settings", "76-repo-branch-confirm.png", "既定のブランチの変更の確認");
+    await page.getByRole("button", { name: "Cancel" }).click();
     await context.close();
   }
 
@@ -303,6 +325,12 @@ async function connected(page, id, opts) {
     await page.goto(url(id, "#repo-settings"));
     await repoSettingsReady(page);
     await shot(page, "Dark", "37-dark-repo-settings.png", "ダーク: Repository settings");
+    await page.getByRole("button", { name: "Change acme-labs/data-pipeline" }).click();
+    await page.getByRole("button", { name: "Make public…" }).click();
+    await shot(page, "Dark", "37a-dark-repo-visibility-warn.png", "ダーク: 公開にする 1 段目");
+    await page.getByRole("button", { name: "I understand" }).click();
+    await shot(page, "Dark", "37b-dark-repo-visibility-confirm.png", "ダーク: 公開にする 2 段目");
+    await page.getByRole("button", { name: "Cancel" }).click();
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
@@ -351,6 +379,20 @@ async function connected(page, id, opts) {
     await page.locator("table.table--repo-settings thead").getByRole("button", { name: /^Wiki/ }).click();
     await shot(page, "日本語", "47a-ja-repo-settings.png", "日本語: Repository settings（保護、Wiki の順に並べ替え）");
     console.log("ja auto refresh title:", await page.getByRole("switch", { name: "自動更新" }).getAttribute("title"));
+    await page.getByRole("button", { name: "acme-labs/data-pipeline を変更" }).click();
+    await page.getByLabel("既定のブランチ", { exact: true }).waitFor();
+    await shot(page, "日本語", "47b-ja-repo-settings-edit.png", "日本語: 変更の欄");
+    await page.getByRole("button", { name: "公開にする…" }).click();
+    await shot(page, "日本語", "47c-ja-repo-visibility-warn.png", "日本語: 公開にする 1 段目");
+    await page.getByRole("button", { name: "内容を確認しました" }).click();
+    await page.getByLabel("続けるには acme-labs/data-pipeline と入力してください。").fill("acme-labs/data-pipeline");
+    await shot(page, "日本語", "47d-ja-repo-visibility-confirm.png", "日本語: 公開にする 2 段目");
+    await page.getByRole("button", { name: "キャンセル" }).click();
+    await page.getByRole("button", { name: "octo-dev/tile-game を変更" }).click();
+    await page.getByLabel("既定のブランチ", { exact: true }).selectOption("legacy");
+    await page.getByRole("button", { name: "既定のブランチを変更…" }).click();
+    await shot(page, "日本語", "47e-ja-repo-branch-confirm.png", "日本語: 既定のブランチの変更の確認");
+    await page.getByRole("button", { name: "キャンセル" }).click();
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     {
@@ -406,6 +448,15 @@ async function connected(page, id, opts) {
     await repoSettingsReady(page);
     await shot(page, "狭い画面（幅 420px）", "57a-narrow-repo-settings.png", "幅 420px: Repository settings（表は枠の中で横にスクロールし、リポジトリの列は左に固定）");
     console.log("narrow repo settings horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.getByRole("button", { name: "Change acme-labs/data-pipeline" }).click();
+    await page.getByLabel("Default branch", { exact: true }).waitFor();
+    await shot(page, "狭い画面（幅 420px）", "57b-narrow-repo-settings-edit.png", "幅 420px: 変更の欄");
+    await page.getByRole("button", { name: "Make public…" }).click();
+    await shot(page, "狭い画面（幅 420px）", "57c-narrow-repo-visibility-warn.png", "幅 420px: 公開にする 1 段目");
+    await page.getByRole("button", { name: "I understand" }).click();
+    await shot(page, "狭い画面（幅 420px）", "57d-narrow-repo-visibility-confirm.png", "幅 420px: 公開にする 2 段目");
+    console.log("narrow repo edit horizontal overflow(px):", await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth));
+    await page.getByRole("button", { name: "Cancel" }).click();
     await page.goto(url(id, "#labels"));
     await labelsReady(page);
     await page.locator("table.table--labels tbody tr").first().getByRole("checkbox").check();
