@@ -91,3 +91,15 @@ export async function listBranchRules(http: GitHubHttp, repo: RepoPath, branch: 
   }
   return rules;
 }
+
+/** 変えられる設定。管理者の権限が要る（Fine-grained PAT は Administration の write） */
+export interface GitHubRepositoryUpdate {
+  visibility?: "public" | "private";
+  default_branch?: string;
+}
+
+/** リポジトリの設定を変え、変えたあとの設定を返す */
+export async function updateRepository(http: GitHubHttp, repo: RepoPath, update: GitHubRepositoryUpdate, call: Call = {}): Promise<GitHubRepositoryDetails> {
+  const { data } = await http.json(repoPath(repo), { ...call, method: "PATCH", body: update });
+  return decode(() => readRepositoryDetails(data));
+}

@@ -21,7 +21,9 @@ export type GitHubOperation =
   | "projects.move"
   | "labels.list"
   | "labels.write"
-  | "repoSettings.read";
+  | "repoSettings.read"
+  | "repoSettings.write"
+  | "repoSettings.branches";
 
 interface Requirement {
   /** Fine-grained PAT の権限（"名前=read|write"）。すべて必要 */
@@ -52,6 +54,9 @@ const REQUIREMENTS: Record<GitHubOperation, Requirement> = {
   "labels.list": { fineGrained: ["issues=read"], classic: ["repo"] },
   "labels.write": { fineGrained: ["issues=write"], classic: ["repo"] },
   "repoSettings.read": { fineGrained: ["metadata=read"], classic: ["repo"] },
+  // 公開範囲と既定のブランチの変更。リポジトリの削除と同じ権限
+  "repoSettings.write": { fineGrained: ["administration=write"], classic: ["repo"] },
+  "repoSettings.branches": { fineGrained: ["contents=read"], classic: ["repo"] },
 };
 
 export interface PermissionHint {

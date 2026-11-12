@@ -615,6 +615,79 @@ const step = async (name, fn) => {
     assert.equal(requests.filter((l) => l.includes("/repos/acme-labs/data-pipeline")).length, 3);
   });
 
+  await step("Repository settings: 公開範囲は 2 段階の確認（影響 → リポジトリ名の入力）を経てから変える", async () => {
+    const table = page.locator("table.table--repo-settings");
+    await page.getByLabel("Only settings with differences").uncheck();
+    await page.getByRole("button", { name: "Change acme-labs/data-pipeline" }).click();
+    await page.getByText("Change acme-labs/data-pipeline").waitFor();
+    await page.getByText(/Administration: Read and write/).waitFor();
+    // 1 段目: 非公開 → 公開の影響
+    await page.getByRole("button", { name: "Make public…" }).click();
+    await page.getByText("Make acme-labs/data-pipeline public.").waitFor();
+    const effects = await page.locator(".repo-settings__effects li").allInnerTexts();
+    assert.equal(effects.length, 8);
+    assert.equal(effects[0], "The code will be visible to everyone who can visit GitHub.com.");
+    await page.screenshot({ path: path.join(OUT, "06n-repo-visibility-warn.png") });
+    // 1 段目で取りやめると何も送らない
+    await page.getByRole("button", { name: "Cancel" }).click();
+    assert.deepEqual(control.repoWrites, []);
+
+    await page.getByRole("button", { name: "Change acme-labs/data-pipeline" }).click();
+    await page.getByRole("button", { name: "Make public…" }).click();
+    await page.getByRole("button", { name: "I understand" }).click();
+    await page.getByText("Are you sure you want to change it?").waitFor();
+    const input = page.getByLabel("Type acme-labs/data-pipeline to continue.");
+    const go = page.getByRole("button", { name: "Make acme-labs/data-pipeline public" });
+    assert.equal(await go.isDisabled(), true);
+    await input.fill("data-pipeline");
+    assert.equal(await go.isDisabled(), true);
+    await input.press("Enter");
+    assert.deepEqual(control.repoWrites, []);
+    await input.fill("acme-labs/data-pipeline");
+    await page.screenshot({ path: path.join(OUT, "06o-repo-visibility-confirm.png") });
+    await go.click();
+    await page.getByText("Made acme-labs/data-pipeline public.").waitFor();
+    assert.deepEqual(control.repoWrites, [`PATCH acme-labs/data-pipeline {"visibility":"public"}`]);
+    // そのリポジトリだけ取り直して、表を今の状態にする
+    const row = table.locator("tbody tr").filter({ has: page.getByRole("link", { name: "acme-labs/data-pipeline" }) });
+    await row.locator("td").first().getByText("Public").waitFor();
+    await page.getByRole("button", { name: "Close" }).click();
+  });
+
+  await step("Repository settings: 既定のブランチは既存のブランチから選び、確認してから変える。変えられなければ必要な権限を示す", async () => {
+    const table = page.locator("table.table--repo-settings");
+    await page.getByRole("button", { name: "Change octo-dev/tile-game" }).click();
+    const select = page.getByLabel("Default branch", { exact: true });
+    await select.waitFor();
+    assert.deepEqual(await select.locator("option").allInnerTexts(), ["master", "legacy"]);
+    const change = page.getByRole("button", { name: "Change default branch…" });
+    assert.equal(await change.isDisabled(), true);
+    await select.selectOption("legacy");
+    await change.click();
+    await page.getByText("Change the default branch of octo-dev/tile-game from master to legacy.").waitFor();
+    await page.screenshot({ path: path.join(OUT, "06p-repo-branch-confirm.png") });
+    const before = control.repoWrites.length;
+    await page.getByRole("button", { name: "Change default branch", exact: true }).click();
+    await page.getByText("Changed the default branch of octo-dev/tile-game to legacy.").waitFor();
+    assert.deepEqual(control.repoWrites.slice(before), [`PATCH octo-dev/tile-game {"default_branch":"legacy"}`]);
+    const row = table.locator("tbody tr").filter({ has: page.getByRole("link", { name: "octo-dev/tile-game" }) });
+    await row.getByText("legacy").waitFor();
+    await page.getByRole("button", { name: "Close" }).click();
+
+    // 権限が足りないとき
+    control.failRepoWrites = true;
+    await page.getByRole("button", { name: "Change acme-labs/web-console" }).click();
+    await page.getByRole("button", { name: "Make public…" }).click();
+    await page.getByRole("button", { name: "I understand" }).click();
+    await page.getByLabel("Type acme-labs/web-console to continue.").fill("acme-labs/web-console");
+    await page.getByRole("button", { name: "Make acme-labs/web-console public" }).click();
+    await page.getByText(/^Could not change acme-labs\/web-console\./).waitFor();
+    await page.locator(".permission-hint li", { hasText: "Administration: Read and write" }).waitFor();
+    control.failRepoWrites = false;
+    await page.getByRole("button", { name: "Close" }).click();
+    await page.getByLabel("Only settings with differences").check();
+  });
+
   await step("Actions: ワークフローをリポジトリごとに表示し、無効なものは既定で隠す", async () => {
     await page.getByRole("link", { name: /^Actions/ }).click();
     await page.getByRole("link", { name: "Deploy", exact: true }).waitFor();
