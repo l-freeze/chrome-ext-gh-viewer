@@ -1,9 +1,11 @@
 import { isGitHubApiError } from "../../../integrations/github/errors";
 import type { GitHubHttp } from "../../../integrations/github/http";
+import { listBranches } from "../../../integrations/github/contents";
 import {
   getBranchSummary,
   getRepositoryDetails,
   listBranchRules,
+  updateRepository,
   type GitHubBranchRule,
   type GitHubBranchSummary,
   type GitHubRepositoryDetails,
@@ -104,6 +106,14 @@ export function createGitHubRepoSettingsSource(httpFor: (repo: RepoRef) => GitHu
         attempt(() => listBranchRules(http, repo, branchName, call(signal))),
       ]);
       return toRepoSettings(repo, details, branch, rules);
+    },
+    listBranches: (repository, signal) => listBranches(httpFor(toRepoRef(repository)), toRepoRef(repository), call(signal)),
+    async update(repository, update) {
+      const repo = toRepoRef(repository);
+      await updateRepository(httpFor(repo), repo, {
+        ...(update.visibility ? { visibility: update.visibility } : {}),
+        ...(update.defaultBranch ? { default_branch: update.defaultBranch } : {}),
+      });
     },
   };
 }

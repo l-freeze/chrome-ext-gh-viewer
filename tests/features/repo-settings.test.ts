@@ -150,3 +150,54 @@ describe("並べ替え", () => {
     expect(sort).toEqual([{ key: "repo", dir: "asc" }]);
   });
 });
+
+describe("公開範囲と既定のブランチの変更", () => {
+  const server = (state: { visibility: string; default_branch: string }) =>
+    testHttp(async (c) => {
+      const p = c.url.pathname;
+      if (p === "/repos/acme/web" && c.method === "PATCH") {
+        Object.assign(state, JSON.parse(c.body ?? "{}"));
+        return json(details(state));
+      }
+      if (p === "/repos/acme/web") return json(details(state));
+      if (p === "/repos/acme/web/branches") return json([{ name: "main" }, { name: "develop" }]);
+      if (p.startsWith("/repos/acme/web/branches/")) return json({ name: state.default_branch, protected: false });
+      if (p.startsWith("/repos/acme/web/rules/branches/")) return json([]);
+      return json({ message: "Not Found" }, { status: 404 });
+    });
+
+  it("公開範囲を PATCH で変え、変えたあとの設定を読み直して返す", async () => {
+    const state = { visibility: "private", default_branch: "main" };
+    const { http, calls } = server(state);
+    const f = createRepoSettingsFeature({ source: createGitHubRepoSettingsSource(() => http) });
+    const after = await f.setVisibility(repo("web"), "public");
+    expect(after.values.visibility).toEqual(known("public"));
+    const writes = calls.filter((c) => c.method !== "GET");
+    expect(writes.map((c) => `${c.method} ${c.url.pathname} ${c.body}`)).toEqual([`PATCH /repos/acme/web {"visibility":"public"}`]);
+  });
+
+  it("既定のブランチは既存のブランチにだけ変える。無いブランチやアーカイブ済みのリポジトリには送らない", async () => {
+    const state = { visibility: "private", default_branch: "main" };
+    const { http, calls } = server(state);
+    const f = createRepoSettingsFeature({ source: createGitHubRepoSettingsSource(() => http) });
+    expect(await f.listBranches(repo("web"))).toEqual(["main", "develop"]);
+    const after = await f.setDefaultBranch(repo("web"), "develop");
+    expect(after.values.defaultBranch).toEqual(known("develop"));
+    await expect(f.setDefaultBranch(repo("web"), "missing")).rejects.toThrow(/Branch not found/);
+    await expect(f.setDefaultBranch(repo("web"), " ")).rejects.toThrow(/Choose a branch/);
+    await expect(f.setVisibility(repo("web", { archived: true }), "public")).rejects.toThrow(/Archived/);
+    await expect(f.setVisibility(repo("web"), "internal" as never)).rejects.toThrow(/Unknown visibility/);
+    const writes = calls.filter((c) => c.method !== "GET");
+    expect(writes.map((c) => `${c.method} ${c.url.pathname} ${c.body}`)).toEqual([`PATCH /repos/acme/web {"default_branch":"develop"}`]);
+  });
+
+  it("変えられなかった（権限不足など）ときは、エラーをそのまま返す", async () => {
+    const { http } = testHttp((c) =>
+      c.method === "PATCH"
+        ? json({ message: "Must have admin rights to Repository." }, { status: 403, headers: { "x-accepted-github-permissions": "administration=write" } })
+        : json(details()),
+    );
+    const f = createRepoSettingsFeature({ source: createGitHubRepoSettingsSource(() => http) });
+    await expect(f.setVisibility(repo("web"), "public")).rejects.toMatchObject({ kind: "forbidden" });
+  });
+});
