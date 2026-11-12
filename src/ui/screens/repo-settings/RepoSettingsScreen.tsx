@@ -6,12 +6,13 @@ import { repoKey } from "../../../features/workspace/repository";
 import { useUi } from "../../app/context";
 import { Failures } from "../../components/Failures";
 import { Icon } from "../../components/Icon";
+import { EditPanel } from "./EditPanel";
 import "./repo-settings.css";
 import type { RepoSettingsState } from "./state";
 
 const groupOf = (key: SettingKey): SettingGroup => SETTINGS.find((s) => s.key === key)!.group;
 
-/** リポジトリの設定の違いの表（閲覧のみ）。行はリポジトリ、列は設定 */
+/** リポジトリの設定の違いの表。行はリポジトリ、列は設定。行の「変更」で公開範囲と既定のブランチを変えられる */
 export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
   const { i18n } = useUi();
   const { t } = i18n;
@@ -128,6 +129,8 @@ export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
         operation="repoSettings.read"
       />
 
+      <EditPanel state={s} />
+
       <Show when={s.rows().length > 0 && s.columns().length > 0}>
         <div class="table-wrap repo-settings__wrap">
           <table class="table table--repo-settings">
@@ -172,11 +175,22 @@ export function RepoSettingsScreen(props: { state: RepoSettingsState }) {
               <For each={s.rows()}>
                 {(row) => (
                   <tr>
-                    <th scope="row" class="repo-settings__repo">
-                      <a href={`https://github.com/${repoKey(row.repo)}/settings`} target="_blank" rel="noreferrer">
-                        <span class="muted">{row.repo.owner}/</span>
-                        {row.repo.name}
-                      </a>
+                    <th scope="row" class="repo-settings__repo" classList={{ "repo-settings__repo--editing": s.edit()?.repo.fullName === repoKey(row.repo) }}>
+                      <div class="repo-settings__repo-line">
+                        <a href={`https://github.com/${repoKey(row.repo)}/settings`} target="_blank" rel="noreferrer">
+                          <span class="muted">{row.repo.owner}/</span>
+                          {row.repo.name}
+                        </a>
+                        <button
+                          type="button"
+                          class="button button--ghost repo-settings__edit-button"
+                          aria-label={t("repoSettings.edit.open", { repo: repoKey(row.repo) })}
+                          disabled={s.edit() !== null && s.edit()!.phase !== "menu"}
+                          onClick={() => void s.open(row)}
+                        >
+                          {t("repoSettings.edit.button")}
+                        </button>
+                      </div>
                     </th>
                     <For each={s.columns()}>{(c) => <Cell value={row.values[c.key]} column={c} />}</For>
                   </tr>

@@ -111,3 +111,61 @@
   padding: 0 8px;
   font-size: 13px;
 }
+
+/* 行の「変更」と、表の上に開く変更の欄 */
+.repo-settings__repo-line {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.repo-settings__edit-button {
+  margin-left: auto;
+  height: 24px;
+  padding: 0 8px;
+  font-size: 12px;
+}
+.table--repo-settings .repo-settings__repo--editing {
+  box-shadow: inset 3px 0 0 var(--accent);
+}
+.repo-settings__edit {
+  color: var(--text);
+  font-weight: 400;
+}
+.repo-settings__edit p {
+  margin: 4px 0;
+  overflow-wrap: anywhere;
+}
+.repo-settings__edit-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px 10px;
+  margin: 6px 0;
+}
+.repo-settings__edit-name {
+  min-width: 120px;
+  font-weight: 600;
+}
+.repo-settings__branch,
+.repo-settings__confirm-input {
+  height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--border-strong);
+  border-radius: 4px;
+  background: var(--surface);
+  color: var(--text);
+}
+.repo-settings__confirm-input {
+  width: 260px;
+  max-width: 100%;
+  border-color: var(--danger);
+}
+.repo-settings__effects {
+  margin: 4px 0 0;
+  padding-left: 20px;
+  color: var(--text);
+  font-weight: 400;
+}
+.repo-settings__effects li {
+  overflow-wrap: anywhere;
+}
