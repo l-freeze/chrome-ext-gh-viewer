@@ -1,4 +1,4 @@
-# Artifact & Issue Manager for GitHub
+# Senju
 
 アクセスできる全リポジトリの GitHub Actions アーティファクトを一覧・ダウンロード・削除し、Issue を Projects に関係なく横断表示する Chrome 拡張機能です。
 
@@ -37,7 +37,7 @@
 
 Chrome ウェブストアには未公開のため、GitHub Actions がビルドした ZIP を手動で読み込みます。
 
-1. このリポジトリの Releases から `master build`（タグ `master-build`）を開き、`chrome-extension.zip` をダウンロードします。`master` に push されるたびに最新のビルドに差し替わります。
+1. このリポジトリの Releases から `master build`（タグ `master-build`）を開き、`gh-senju.zip` をダウンロードします。`master` に push されるたびに最新のビルドに差し替わります。
 2. ZIP を展開し、できたフォルダを消さない場所に置きます。Chrome はこのフォルダから拡張機能を読み込み続けます。
 3. Chrome で `chrome://extensions` を開き、右上の「デベロッパー モード」をオンにします。
 4. 「パッケージ化されていない拡張機能を読み込む」を押し、展開したフォルダ（`manifest.json` が入っているフォルダ）を選びます。
@@ -47,7 +47,7 @@ Chrome ウェブストアには未公開のため、GitHub Actions がビルド�
 
 ### 更新
 
-新しい `chrome-extension.zip` をダウンロードし、手順 2 のフォルダの中身を置き換えてから、`chrome://extensions` で拡張機能の再読み込みボタン（円形の矢印）を押します。
+新しい `gh-senju.zip` をダウンロードし、手順 2 のフォルダの中身を置き換えてから、`chrome://extensions` で拡張機能の再読み込みボタン（円形の矢印）を押します。
 
 同じフォルダから読み込む限り、設定と登録したトークンは引き継がれます。別のフォルダから読み込むと別の拡張機能として扱われ、設定とトークンは引き継がれません。
 

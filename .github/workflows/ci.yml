@@ -44,9 +44,9 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run zip
-      - name: Publish chrome-extension.zip to the master-build pre-release
+      - name: Publish gh-senju.zip to the master-build pre-release
         run: |
-          cp .output/*-chrome.zip chrome-extension.zip
+          cp .output/*-chrome.zip gh-senju.zip
           git tag -f "$TAG"
           git push -f origin "refs/tags/$TAG"
           notes="master の最新ビルド（${GITHUB_SHA::7}）。Chrome への入れ方は README の「手動インストール」を参照してください。"
@@ -55,4 +55,8 @@ jobs:
           else
             gh release create "$TAG" --prerelease --title "master build" --notes "$notes"
           fi
-          gh release upload "$TAG" chrome-extension.zip --clobber
+          gh release upload "$TAG" gh-senju.zip --clobber
+          # 名前を変える前の ZIP が残っていれば外す（古いビルドを取り違えないように）
+          if gh release view "$TAG" --json assets --jq '.assets[].name' | grep -qx chrome-extension.zip; then
+            gh release delete-asset "$TAG" chrome-extension.zip --yes
+          fi
