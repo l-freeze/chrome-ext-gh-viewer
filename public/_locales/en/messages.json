@@ -1,4 +1,4 @@
 {
-  "extName": { "message": "Artifact & Issue Manager for GitHub" },
+  "extName": { "message": "Senju - Manage all your GitHub repositories at once" },
   "extDescription": { "message": "List, download and delete GitHub Actions artifacts and browse issues across every repository you can access." }
 }

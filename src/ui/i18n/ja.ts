@@ -4,7 +4,7 @@ import type { Messages } from "./en";
 const same = (s: string) => ({ one: s, other: s });
 
 export const ja: Messages = {
-  "app.title": "Artifact & Issue Manager",
+  "app.title": "Senju",
   "tab.artifacts": "Artifacts",
   "tab.caches": "Caches",
   "tab.actions": "Actions",

@@ -2,7 +2,7 @@
 // {name} はパラメーター。{ one, other } は count による単数・複数の切り替え。
 
 export const en = {
-  "app.title": "Artifact & Issue Manager",
+  "app.title": "Senju",
   "tab.artifacts": "Artifacts",
   "tab.caches": "Caches",
   "tab.actions": "Actions",
